@@ -1,0 +1,54 @@
+{
+	"name": "RealLastUpdate",
+	"version": "0.1.0",
+	"author": [
+		"Dror S. [FFS] ([https://www.kolzchut.org.il Kol-Zchut])"
+	],
+	"url": "https://github.com/kolzchut/mediawiki-extensions-RealLastUpdate",
+	"descriptionmsg": "reallastupdate-desc",
+	"license-name": "GPL-2.0-or-later",
+	"type": "other",
+	"requires": {
+		"MediaWiki": ">= 1.35.0"
+	},
+	"AutoloadNamespaces": {
+		"MediaWiki\\Extension\\RealLastUpdate\\": "includes/"
+	},
+	"ConfigRegistry": {
+		"reallastupdate": "GlobalVarConfig::newInstance"
+	},
+	"config": {
+		"RealLastUpdateBotGroups": {
+			"value": [ "bot" ],
+			"merge_strategy": "provide_default",
+			"description": "User groups to consider as bots"
+		}
+	},
+	"Hooks": {
+		"OutputPageParserOutput": "main",
+		"PageSaveComplete": "main",
+		"LoadExtensionSchemaUpdates": "main"
+	},
+	"HookHandlers": {
+		"main": {
+			"class": "MediaWiki\\Extension\\RealLastUpdate\\Hooks"
+		}
+	},
+	"MessagesDirs": {
+		"RealLastUpdate": [
+			"i18n"
+		]
+	},
+	"SpecialPages": {
+		"RealLastUpdate": "MediaWiki\\Extension\\RealLastUpdate\\SpecialRealLastUpdate"
+	},
+	"ExtensionMessagesFiles": {
+		"RealLastUpdateAlias": "i18n/RealLastUpdate.alias.php"
+	},
+	"APIModules": {
+		"reallastupdate": {
+			"class": "MediaWiki\\Extension\\RealLastUpdate\\Api\\ApiRealLastUpdate"
+		}
+	},
+	"manifest_version": 2
+}

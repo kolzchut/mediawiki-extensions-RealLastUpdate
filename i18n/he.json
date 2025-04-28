@@ -1,0 +1,22 @@
+{
+	"@metadata": {
+		"authors": [
+			"Dror S. [ffs]"
+		]
+	},
+	"reallastupdate-desc": "שמירת תאריך העדכון האחרון על ידי עורך אנושי",
+	"reallastupdate-apierror-no-real-revision": "לא נמצאה גרסה אנושית עבור \"$1\"",
+	"reallastupdate": "עדכון אחרון אמיתי",
+	"reallastupdate-specialpage-desc": "הצגת דפים עם זמני העריכה האנושית האחרונה שלהם",
+	"reallastupdate-namespace": "סינון לפי מרחב שם:",
+	"reallastupdate-articletype": "סוג הערך:",
+	"reallastupdate-contentarea": "תחום תוכן:",
+	"reallastupdate-filter": "סינון",
+	"reallastupdate-filter-legend": "אפשרויות סינון",
+	"reallastupdate-all": "הכל",
+	"reallastupdate-page": "דף",
+	"reallastupdate-timestamp": "עריכה אנושית אחרונה",
+	"reallastupdate-regular-timestamp": "עריכה אחרונה (כל משתמש)",
+	"reallastupdate-no-data": "אין עריכות אנושיות",
+	"reallastupdate-no-regular-data": "אין עריכות"
+}

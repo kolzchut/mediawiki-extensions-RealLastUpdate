@@ -1,0 +1,22 @@
+{
+	"@metadata": {
+		"authors": [
+			"Dror S. [ffs]"
+		]
+	},
+	"reallastupdate-desc": "Save the last update date by a flesh and blood editor",
+	"reallastupdate-apierror-no-real-revision": "No real revision was found for \"$1\"",
+	"reallastupdate": "Real last update",
+	"reallastupdate-specialpage-desc": "Shows pages with their last human edit timestamps",
+	"reallastupdate-namespace": "Filter by namespace:",
+	"reallastupdate-articletype": "Article type:",
+	"reallastupdate-contentarea": "Content area:",
+	"reallastupdate-filter": "Filter",
+	"reallastupdate-filter-legend": "Filter options",
+	"reallastupdate-all": "All",
+	"reallastupdate-page": "Page",
+	"reallastupdate-timestamp": "Last human edit",
+	"reallastupdate-regular-timestamp": "Last edit (any user)",
+	"reallastupdate-no-data": "No human edits",
+	"reallastupdate-no-regular-data": "No edits"
+}

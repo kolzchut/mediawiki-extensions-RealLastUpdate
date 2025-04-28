@@ -1,0 +1,20 @@
+{
+	"@metadata": {
+		"authors": [
+		]
+	},
+	"reallastupdate-desc": "{{desc|name=RealLastUpdate|url=https://github.com/kolzchut/mediawiki-extensions-RealLastUpdate}}",
+	"reallastupdate": "{{doc-special|RealLastUpdate}}",
+	"reallastupdate-specialpage-desc": "{{doc-special|RealLastUpdate}}",
+	"reallastupdate-namespace": "Label for namespace filter in special page form",
+	"reallastupdate-articletype": "Label for article type filter in special page form",
+	"reallastupdate-contentarea": "Label for content area filter in special page form",
+	"reallastupdate-filter": "Label for filter button in special page form",
+	"reallastupdate-filter-legend": "Legend for filter form in special page",
+	"reallastupdate-all": "Option shown in dropdown menus for 'All'",
+	"reallastupdate-page": "Column header for page name",
+	"reallastupdate-timestamp": "Column header for last human edit timestamp",
+	"reallastupdate-regular-timestamp": "Column header for last edit timestamp (by any user)",
+	"reallastupdate-no-data": "Text shown when no human edits are recorded for a page",
+	"reallastupdate-no-regular-data": "Text shown when no edits are recorded for a page"
+}
