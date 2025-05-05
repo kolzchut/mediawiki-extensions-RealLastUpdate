@@ -27,7 +27,7 @@ use Maintenance;
 use MediaWiki\Extension\RealLastUpdate\RealLastUpdate;
 use Title;
 
-$IP = getenv( 'MW_INSTALL_PATH' ) ?: __DIR__ . '/../../..';
+$IP = getenv( 'MW_INSTALL_PATH' ) ?: __DIR__ . '/../../../..';
 require_once "$IP/maintenance/Maintenance.php";
 
 /**
