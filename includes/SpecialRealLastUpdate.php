@@ -34,7 +34,7 @@ class SpecialRealLastUpdate extends SpecialPage {
 	protected array $formFilter = [];
 
 	public function __construct() {
-		parent::__construct( 'RealLastUpdate' );
+		parent::__construct( 'RealLastUpdate', 'edit' );
 	}
 
 	/**
