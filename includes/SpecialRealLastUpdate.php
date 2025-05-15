@@ -45,6 +45,7 @@ class SpecialRealLastUpdate extends SpecialPage {
 		$this->outputHeader();
 		$out = $this->getOutput();
 		$out->addModuleStyles( 'mediawiki.special' );
+		$out->addModules( 'ext.realLastUpdate.special' );
 
 		// Parse request parameters
 		$request = $this->getRequest();

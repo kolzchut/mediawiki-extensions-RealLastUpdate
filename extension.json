@@ -27,7 +27,8 @@
 	"Hooks": {
 		"OutputPageParserOutput": "main",
 		"PageSaveComplete": "main",
-		"LoadExtensionSchemaUpdates": "main"
+		"LoadExtensionSchemaUpdates": "main",
+		"GetPreferences": "main"
 	},
 	"HookHandlers": {
 		"main": {
@@ -38,6 +39,25 @@
 		"RealLastUpdate": [
 			"i18n"
 		]
+	},
+	"ResourceModules": {
+		"ext.realLastUpdate.special": {
+			"styles": "resources/ext.realLastUpdate.special/index.css",
+			"scripts": "resources/ext.realLastUpdate.special/index.js",
+			"messages": [
+				"reallastupdate-show-all-dates"
+			],
+			"dependencies": [
+				"oojs-ui-core",
+				"oojs-ui-widgets",
+				"mediawiki.api",
+				"mediawiki.user"
+			]
+		}
+	},
+	"ResourceFileModulePaths": {
+		"localBasePath": "",
+		"remoteExtPath": "WikiRights/RealLastUpdate"
 	},
 	"SpecialPages": {
 		"RealLastUpdate": "MediaWiki\\Extension\\RealLastUpdate\\SpecialRealLastUpdate"

@@ -16,5 +16,7 @@
 	"reallastupdate-timestamp": "Column header for last human edit timestamp",
 	"reallastupdate-regular-timestamp": "Column header for last edit timestamp (by any user)",
 	"reallastupdate-no-data": "Text shown when no human edits are recorded for a page",
-	"reallastupdate-no-regular-data": "Text shown when no edits are recorded for a page"
+	"reallastupdate-no-regular-data": "Text shown when no edits are recorded for a page",
+	"reallastupdate-identical-to-human": "Text shown when the regular edit date matches the human edit date",
+	"reallastupdate-show-all-dates": "Label for toggle button and user preference to show all dates"
 }

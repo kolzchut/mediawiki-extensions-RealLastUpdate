@@ -18,14 +18,15 @@
 
 namespace MediaWiki\Extension\RealLastUpdate;
 
-use DatabaseUpdater;
 use MediaWiki\Hook\OutputPageParserOutputHook;
 use MediaWiki\Installer\Hook\LoadExtensionSchemaUpdatesHook;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\Preferences\Hook\GetPreferencesHook;
 use MediaWiki\Storage\Hook\PageSaveCompleteHook;
 use MediaWiki\User\UserIdentity;
 use Parser;
 use ParserOutput;
+use User;
 
 /**
  * Hooks for RealLastUpdate extension
@@ -33,7 +34,8 @@ use ParserOutput;
 class Hooks implements
 	PageSaveCompleteHook,
 	OutputPageParserOutputHook,
-	LoadExtensionSchemaUpdatesHook
+	LoadExtensionSchemaUpdatesHook,
+	GetPreferencesHook
 {
 	private const PROP_TIME = 'RealLastUpdateTimestamp';
 	private const PROP_REV = 'RealLastUpdateRevision';
@@ -143,4 +145,21 @@ class Hooks implements
 		$updater->addExtensionTable( 'real_last_update',
 			"$extDir/sql/tables.sql" );
 	}
+
+	/**
+	 * Hook handler for GetPreferences
+	 * Register the user preference but don't show it in the preferences UI
+	 * It will be managed via JavaScript on the special page
+	 *
+	 * @param User $user The user object
+	 * @param array &$preferences Preferences array
+	 */
+	public function onGetPreferences( $user, &$preferences ) {
+		// Register the preference so it can be saved, but don't add it to the UI
+		$preferences['reallastupdate-showalldates'] = [
+			'type' => 'api',
+			'default' => false
+		];
+	}
 }
+

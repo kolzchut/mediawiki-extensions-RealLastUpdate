@@ -18,5 +18,7 @@
 	"reallastupdate-timestamp": "עריכה אנושית אחרונה",
 	"reallastupdate-regular-timestamp": "עריכה אחרונה (כל משתמש)",
 	"reallastupdate-no-data": "אין עריכות אנושיות",
-	"reallastupdate-no-regular-data": "אין עריכות"
+	"reallastupdate-no-regular-data": "אין עריכות",
+	"reallastupdate-identical-to-human": "זהה לעריכה האנושית",
+	"reallastupdate-show-all-dates": "הצג את כל התאריכים"
 }

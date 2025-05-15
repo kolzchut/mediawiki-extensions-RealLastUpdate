@@ -42,14 +42,25 @@ class RealLastUpdatePager extends TablePager {
 	protected $filterOptions;
 
 	/**
+	 * @var bool
+	 */
+	protected $showAllDates;
+
+	/**
 	 * @param SpecialRealLastUpdate $specialPage
 	 * @param array $filterOptions
 	 */
 	public function __construct( $specialPage, $filterOptions ) {
 		parent::__construct( $specialPage->getContext() );
+
+		$this->getOutput()->addModules( 'ext.reallastupdate.special' );
 		$this->specialPage = $specialPage;
 		$this->filterOptions = $filterOptions;
-		$this->mDefaultDirection = IndexPager::DIR_ASCENDING; // Oldest first
+		// Oldest first
+		$this->mDefaultDirection = IndexPager::DIR_ASCENDING;
+
+		// Get user preference for showing all dates
+		$this->showAllDates = $this->getUser()->getOption( 'reallastupdate-showalldates', false );
 	}
 
 	/**
@@ -145,7 +156,7 @@ class RealLastUpdatePager extends TablePager {
 				}
 
 				$lang = $this->getLanguage();
-				$formatted = $lang->timeanddate( $value, true );
+				$formatted = $lang->userTimeAndDate( $value, $this->getUser() );
 
 				// If we have a revision ID, link to the diff
 				if ( $row->real_last_update_revid ) {
@@ -162,16 +173,30 @@ class RealLastUpdatePager extends TablePager {
 				}
 
 				$lang = $this->getLanguage();
-				$formatted = $lang->timeanddate( $value, true );
-
+				$formattedDate = $lang->timeanddate( $value, true );
 				// If we have a revision ID, link to the diff
 				if ( $row->regular_update_revid ) {
 					$title = Title::makeTitle( $row->page_namespace, $row->page_title );
 					$url = $title->getLocalURL( [ 'oldid' => $row->regular_update_revid ] );
-					return \Linker::makeExternalLink( $url, $formatted );
+					$formattedDate = \Linker::makeExternalLink( $url, $formattedDate );
 				}
 
-				return $formatted;
+				// Check if the values are identical and we're not showing all dates
+				if ( $row->real_last_update_timestamp &&
+					$value === $row->real_last_update_timestamp ) {
+
+					// Create container with both spans for identical timestamps
+					return '<div class="reallastupdate-container">' .
+						'<span class="reallastupdate-identical-text">' .
+						$this->msg( 'reallastupdate-identical-to-human' )->escaped() .
+						'</span>' .
+						'<span class="reallastupdate-identical-date" style="display: none;">' .
+						$formattedDate .
+						'</span>' .
+						'</div>';
+				} else {
+					return $formattedDate;
+				}
 
 			default:
 				return $value;
@@ -197,5 +222,22 @@ class RealLastUpdatePager extends TablePager {
 		}
 
 		return $defaultQuery;
+	}
+
+	/**
+	 * add a container for our toggle button
+	 *
+	 * @return string HTML
+	 */
+	public function getStartBody(): string {
+		$body = parent::getStartBody();
+
+		// Prepare a location for the toggle button. It will be added by Javascript code
+		$toggleHTML = \Html::element(
+			'div',
+			[ 'class' => 'reallastupdate-toggle-container' ],
+		);
+
+		return $body . $toggleHTML;
 	}
 }
