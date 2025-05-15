@@ -84,7 +84,10 @@ class RealLastUpdatePager extends TablePager {
 				'real_last_update' => [ 'LEFT JOIN', 'page_id = real_last_update.rlud_page_id' ],
 				'revision' => [ 'LEFT JOIN', 'page_id = revision.rev_page' ],
 			],
-			'options' => [ 'GROUP BY' => 'page_id, page_namespace, page_title, real_last_update.rlud_timestamp, real_last_update.rlud_rev_id' ],
+			'options' => [ 'GROUP BY' => [
+				'page_id', 'page_namespace', 'page_title', 'real_last_update.rlud_timestamp',
+				'real_last_update.rlud_rev_id'
+			] ],
 		];
 
 		// Filter by namespace if specified
