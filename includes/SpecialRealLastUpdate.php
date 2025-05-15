@@ -23,6 +23,7 @@
 
 namespace MediaWiki\Extension\RealLastUpdate;
 
+use ExtensionRegistry;
 use HTMLForm;
 use SpecialPage;
 
@@ -77,7 +78,7 @@ class SpecialRealLastUpdate extends SpecialPage {
 		];
 
 		// Add article type filter if ArticleType extension is loaded
-		if ( \ExtensionRegistry::getInstance()->isLoaded( 'ArticleType' ) ) {
+		if ( ExtensionRegistry::getInstance()->isLoaded( 'ArticleType' ) ) {
 			$articleTypes = [];
 			$validTypes = \MediaWiki\Extension\ArticleType\ArticleType::getValidArticleTypes();
 
@@ -99,7 +100,7 @@ class SpecialRealLastUpdate extends SpecialPage {
 		}
 
 		// Add content area filter if ArticleContentArea extension is loaded
-		if ( class_exists( 'MediaWiki\Extension\ArticleContentArea\ArticleContentArea' ) ) {
+		if ( ExtensionRegistry::getInstance()->isLoaded( 'ArticleContentArea' ) ) {
 			$contentAreas = [];
 			$validAreas = \MediaWiki\Extension\ArticleContentArea\ArticleContentArea::getAssignedContentAreas();
 

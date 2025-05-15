@@ -23,8 +23,9 @@
 
 namespace MediaWiki\Extension\RealLastUpdate;
 
-use TablePager;
+use ExtensionRegistry;
 use IndexPager;
+use TablePager;
 use Title;
 
 /**
@@ -102,7 +103,9 @@ class RealLastUpdatePager extends TablePager {
 		}
 
 		// Add ArticleContentArea join if extension is loaded and filter is set
-		if ( class_exists( 'MediaWiki\Extension\ArticleContentArea\ArticleContentArea' ) && $this->filterOptions['contentarea'] ) {
+		if ( $this->filterOptions['contentarea'] &&
+			ExtensionRegistry::getInstance()->isLoaded( 'ArticleContentArea' )
+		) {
 			$contentAreaJoin = \MediaWiki\Extension\ArticleContentArea\ArticleContentArea::getJoin(
 				$this->filterOptions['contentarea']
 			);
