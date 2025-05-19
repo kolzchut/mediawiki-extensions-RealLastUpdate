@@ -79,7 +79,9 @@ class RealLastUpdatePager extends TablePager {
 				'regular_update_timestamp' => 'MAX(revision.rev_timestamp)',
 				'regular_update_revid' => 'MAX(revision.rev_id)',
 			],
-			'conds' => [],
+			'conds' => [
+				'page_is_redirect' => false
+			],
 			'join_conds' => [
 				'real_last_update' => [ 'LEFT JOIN', 'page_id = real_last_update.rlud_page_id' ],
 				'revision' => [ 'LEFT JOIN', 'page_id = revision.rev_page' ],

@@ -6,6 +6,7 @@
 	},
 	"reallastupdate-desc": "שמירת תאריך העדכון האחרון על ידי עורך אנושי",
 	"reallastupdate-apierror-no-real-revision": "לא נמצאה גרסה אנושית עבור \"$1\"",
+	"reallastupdate-apierror-is-redirect": "לא ניתן לקבל את העדכון האחרון האמיתי עבור דף הפניה \"$1\"",
 	"reallastupdate": "עדכון אחרון אמיתי",
 	"reallastupdate-specialpage-desc": "הצגת דפים עם זמני העריכה האנושית האחרונה שלהם",
 	"reallastupdate-namespace": "סינון לפי מרחב שם:",

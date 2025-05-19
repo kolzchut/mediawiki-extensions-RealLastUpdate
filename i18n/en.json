@@ -6,6 +6,7 @@
 	},
 	"reallastupdate-desc": "Save the last update date by a flesh and blood editor",
 	"reallastupdate-apierror-no-real-revision": "No real revision was found for \"$1\"",
+	"reallastupdate-apierror-is-redirect": "Cannot get real last update for redirect page \"$1\"",
 	"reallastupdate": "Real last update",
 	"reallastupdate-specialpage-desc": "Shows pages with their last human edit timestamps",
 	"reallastupdate-namespace": "Filter by namespace:",

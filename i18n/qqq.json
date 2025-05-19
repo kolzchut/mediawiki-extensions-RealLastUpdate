@@ -18,5 +18,6 @@
 	"reallastupdate-no-data": "Text shown when no human edits are recorded for a page",
 	"reallastupdate-no-regular-data": "Text shown when no edits are recorded for a page",
 	"reallastupdate-identical-to-human": "Text shown when the regular edit date matches the human edit date",
-	"reallastupdate-show-all-dates": "Label for toggle button and user preference to show all dates"
+	"reallastupdate-show-all-dates": "Label for toggle button and user preference to show all dates",
+	"reallastupdate-apierror-is-redirect": "Error message shown when API request is made for a redirect page. Parameter: $1 - page title"
 }

@@ -67,7 +67,7 @@ class PopulateRealLastUpdateTable extends Maintenance {
 			$res = $dbr->select(
 				'page',
 				[ 'page_id', 'page_namespace', 'page_title' ],
-				[],
+				[ 'page_is_redirect' => false ],
 				__METHOD__,
 				[
 					'ORDER BY' => 'page_id',

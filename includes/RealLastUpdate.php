@@ -120,6 +120,12 @@ class RealLastUpdate {
 		$dbr = self::getDB();
 		$actorsToIgnore = self::getIgnoredActorIds();
 
+		// Skip redirect pages
+		$wikiPage = \WikiPage::newFromID( $pageId );
+		if ( $wikiPage && $wikiPage->isRedirect() ) {
+			return false;
+		}
+
 		// Query for the most recent revision where the actor is not in our ignored list
 		$revisionStore = MediaWikiServices::getInstance()->getRevisionStore();
 		$queryInfo = $revisionStore->getQueryInfo();
@@ -251,3 +257,4 @@ class RealLastUpdate {
 		];
 	}
 }
+

@@ -54,7 +54,7 @@ class Hooks implements
 
 		// No saved date or revision, we need to find the last "real" revision
 		$pageId = $out->getTitle()->getArticleID();
-		if ( $pageId > 0 ) {
+		if ( $pageId > 0 && !$out->getTitle()->isRedirect() ) {
 			$lastRealEdit = RealLastUpdate::getLastRealEdit( $pageId );
 			if ( $lastRealEdit ) {
 				if ( method_exists( $parserOutput, 'setPageProperty' ) ) {
@@ -93,6 +93,11 @@ class Hooks implements
 			return;
 		}
 
+		// Skip if this is a redirect
+		if ( $title->isRedirect() ) {
+			return;
+		}
+
 		// Get the last real edit information
 		$lastRealEdit = RealLastUpdate::getLastRealEdit( $pageId );
 		if ( !$lastRealEdit ) {
@@ -119,6 +124,11 @@ class Hooks implements
 	 * @inheritDoc
 	 */
 	public function onPageSaveComplete( $wikiPage, $user, $summary, $flags, $revisionRecord, $editResult ) {
+		// Skip updates for redirects
+		if ( $wikiPage->isRedirect() ) {
+			return;
+		}
+
 		$isHuman = RealLastUpdate::isHuman( $user );
 		if ( $isHuman ) {
 			// If human edit, update the database with the revision information

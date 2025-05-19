@@ -41,6 +41,11 @@ class ApiRealLastUpdate extends ApiBase {
 		$params = $this->extractRequestParams();
 		$wikiPage = $this->getTitleOrPageId( $params );
 
+		// Check if this is a redirect and fail early
+		if ( $wikiPage->isRedirect() ) {
+			$this->dieWithError( [ 'reallastupdate-apierror-is-redirect', $wikiPage->getTitle() ] );
+		}
+
 		$result = RealLastUpdate::getLastRealEdit( $wikiPage->getId() );
 		if ( !$result ) {
 			$this->dieWithError( [ 'reallastupdate-apierror-no-real-revision', $wikiPage->getTitle() ] );
@@ -67,3 +72,4 @@ class ApiRealLastUpdate extends ApiBase {
 	}
 
 }
+
