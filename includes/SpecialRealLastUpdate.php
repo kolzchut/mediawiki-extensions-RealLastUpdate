@@ -50,7 +50,7 @@ class SpecialRealLastUpdate extends SpecialPage {
 
 		// Parse request parameters
 		$request = $this->getRequest();
-		$this->formFilter['namespace'] = $request->getIntOrNull( 'namespace', NS_MAIN );
+		$this->formFilter['namespace'] = $request->getInt( 'namespace', NS_MAIN );
 		$this->formFilter['articletype'] = $request->getVal( 'articletype' );
 		$this->formFilter['contentarea'] = $request->getVal( 'contentarea' );
 
