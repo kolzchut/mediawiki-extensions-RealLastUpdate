@@ -43,8 +43,14 @@ class PopulateRealLastUpdateTable extends Maintenance {
 	}
 
 	public function execute() {
+		$dbw = $this->getDB( DB_PRIMARY );
 		$dbr = $this->getDB( DB_REPLICA );
 		$batchSize = $this->getOption( 'batch-size', $this->getBatchSize() );
+
+		// First delete all existing records
+		$this->output( "Deleting all existing records from real_last_update table...\n" );
+		$dbw->delete( 'real_last_update', '*', __METHOD__ );
+		$this->output( "Existing records deleted.\n" );
 
 		// Get the IDs of bot users first
 		$actorsToIgnore = RealLastUpdate::getIgnoredActorIds();
