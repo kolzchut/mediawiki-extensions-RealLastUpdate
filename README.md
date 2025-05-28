@@ -39,16 +39,16 @@ there.
    php maintenance/run.php PopulateRealLastUpdateTable
    ```
 
+## Configuration
+
+- `$wgRealLastUpdateBotGroups`: Array of user groups considered bots (default: `[ 'bot', 'automaton' ]`).
+- `$wgRealLastUpdateSourceWiki`: (Optional) Name of the source wiki for cross-wiki support.
+- `$wgRealLastUpdateSourceWikiApi`: (Optional) API URL for the source wiki (used for API-based cross-wiki support).
+- `$wgRealLastUpdateSourceWikiDb`: (Optional) Database identifier for direct access to the source wiki database (used for DB-based cross-wiki support).
+
 ## Technical Details
 
-The extension stores two page properties that can be accessed through the MediaWiki API:
-- `RealLastUpdateTime`: The timestamp of the last edit by a human
-- `RealLastUpdateRev`: The revision ID of the last edit by a human
-
-You can access these values through the standard API by requesting page properties:
-```
-api.php?action=query&prop=pageprops&titles=YourPageTitle&ppprop=RealLastUpdateTime|RealLastUpdateRev
-```
+The extension stores last human edit information in a dedicated database table and exposes it via a custom API module.
 
 ### Database Structure
 
@@ -58,17 +58,20 @@ The extension uses a dedicated database table called `real_last_update` to store
 - `rlud_rev_id`: The revision ID of the last human edit
 - `rlud_timestamp`: The timestamp of the last human edit
 
-### Cross-Wiki Support
+### API Module
 
-When using this extension across multiple wikis, it can track and display last update information from a source wiki. 
-For this functionality to work properly:
+The extension provides a custom API module for querying last human edit information:
 
-1. Configure `$wgRealLastUpdateSourceWiki` to specify the source wiki name
-2. Ensure an interwiki prefix is set up for the source wiki that matches the name in `$wgRealLastUpdateSourceWiki`
-3. The special page will display and allow sorting by the source wiki's last update timestamp
-4. The timestamp will link to the corresponding page on the source wiki using the interwiki link
+- **Module name:** `reallastupdate`
+- **Usage example:**
+  ```
+  api.php?action=query&prop=reallastupdate&titles=YourPageTitle
+  ```
+- **Parameters:**
+  - `followredirects` (boolean): Follow up to two levels of redirects (default: false)
+  - `debug` (boolean): Include debug information in the response (default: false)
 
-### Example API Response
+#### Example API Response
 
 ```json
 {
@@ -76,17 +79,41 @@ For this functionality to work properly:
     "pages": {
       "123": {
         "pageid": 123,
-        "ns": 0,
         "title": "YourPageTitle",
-        "pageprops": {
-          "RealLastUpdateTime": "20220514160823",
-          "RealLastUpdateRev": "5678"
+        "reallastupdate": {
+          "revision": 5678,
+          "timestamp": "20220514160823"
         }
       }
     }
   }
 }
 ```
+
+### Cross-Wiki Support
+
+When using this extension across multiple wikis, it can track and display last update information from a source wiki. The extension supports two methods for fetching data from the source wiki:
+
+- **Direct Database Access:** The extension reads the `real_last_update` table directly from the source wiki's database, using the `$wgRealLastUpdateSourceWikiDb` setting. This requires appropriate database permissions and network access.
+- **API Access:** The extension fetches last update information from the source wiki using its API, as configured in `$wgRealLastUpdateSourceWikiApi`. This is useful when direct database access is not possible.
+
+To enable cross-wiki support:
+
+1. Set `$wgRealLastUpdateSourceWiki` to the source wiki's name.
+2. Set either `$wgRealLastUpdateSourceWikiDb` (for DB access) or `$wgRealLastUpdateSourceWikiApi` (for API access) as appropriate.
+3. Ensure an interwiki prefix is set up for the source wiki that matches the name in `$wgRealLastUpdateSourceWiki`.
+4. **Schedule the cross-wiki maintenance script** to run periodically (e.g., via cron) to keep the local data in sync:
+   ```
+   # Example cron entry to run every hour
+   0 * * * * php extensions/WikiRights/RealLastUpdate/Maintenance/UpdateCrossWikiRealLastUpdate.php
+   ```
+5. The special page will display and allow sorting by the source wiki's last update timestamp. The timestamp will link to the corresponding page on the source wiki using the interwiki link.
+
+### Special Page
+
+The extension provides a special page, `Special:RealLastUpdate`, which lists pages and their last real update information. This page allows sorting and filtering, and integrates cross-wiki data if configured.
+
 ## License
 
 This extension is licensed under the GNU General Public License v2.0 or later.
+
