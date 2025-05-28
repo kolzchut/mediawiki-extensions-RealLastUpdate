@@ -24,9 +24,14 @@
 namespace MediaWiki\Extension\RealLastUpdate;
 
 use ExtensionRegistry;
+use Html;
 use IndexPager;
+use MalformedTitleException;
+use MediaWiki\Linker\LinkRenderer;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\User\UserOptionsLookup;
 use TablePager;
+use TitleParser;
 use TitleValue;
 
 /**
@@ -36,12 +41,12 @@ class RealLastUpdatePager extends TablePager {
 	/**
 	 * @var SpecialRealLastUpdate
 	 */
-	protected $specialPage;
+	protected SpecialRealLastUpdate $specialPage;
 
 	/**
 	 * @var array
 	 */
-	protected $filterOptions;
+	protected array $filterOptions;
 
 	/**
 	 * @var bool
@@ -49,26 +54,52 @@ class RealLastUpdatePager extends TablePager {
 	protected $showAllDates;
 
 	/**
+	 * @var LinkRenderer
+	 */
+	protected LinkRenderer $linkRenderer;
+
+	/**
+	 * @var UserOptionsLookup
+	 */
+	protected UserOptionsLookup $userOptionsLookup;
+
+	/**
+	 * @var TitleParser
+	 */
+	protected TitleParser $titleParser;
+
+	/**
 	 * @param SpecialRealLastUpdate $specialPage
 	 * @param array $filterOptions
+	 * @param UserOptionsLookup|null $userOptionsLookup
+	 * @param TitleParser|null $titleParser
 	 */
-	public function __construct( $specialPage, $filterOptions ) {
+	public function __construct(
+		$specialPage,
+		$filterOptions,
+		UserOptionsLookup $userOptionsLookup = null,
+		TitleParser $titleParser = null
+	) {
 		parent::__construct( $specialPage->getContext() );
+
+		// Allow falling back to service container for backwards compatibility
+		$services = MediaWikiServices::getInstance();
+		$this->userOptionsLookup = $userOptionsLookup ?? $services->getUserOptionsLookup();
+		$this->titleParser = $titleParser ?? $services->getTitleParser();
 
 		$this->getOutput()->addModules( 'ext.reallastupdate.special' );
 		$this->specialPage = $specialPage;
 		$this->filterOptions = $filterOptions;
-		// Oldest first
-		$this->mDefaultDirection = IndexPager::DIR_ASCENDING;
 
 		// Get user preference for showing all dates
-		$this->showAllDates = $this->getUser()->getOption( 'reallastupdate-showalldates', false );
+		$this->showAllDates = $this->userOptionsLookup
+			->getOption( $this->getUser(), 'reallastupdate-showalldates', false );
 	}
 
 	/**
 	 * @inheritDoc
 	 */
-	public function getQueryInfo() {
+	public function getQueryInfo(): array {
 		$queryInfo = [
 			'tables' => [ 'page', 'real_last_update', 'revision' ],
 			'fields' => [
@@ -129,10 +160,10 @@ class RealLastUpdatePager extends TablePager {
 
 			// Explicitly include rlucw_source_timestamp and rlucw_source_title in the fields
 			// to ensure they're available for sorting and display
-			if (!isset($queryInfo['fields']['rlucw_source_timestamp'])) {
+			if ( !isset( $queryInfo['fields']['rlucw_source_timestamp'] ) ) {
 				$queryInfo['fields']['rlucw_source_timestamp'] = 'real_last_update_cross_wiki.rlucw_source_timestamp';
 			}
-			if (!isset($queryInfo['fields']['rlucw_source_title'])) {
+			if ( !isset( $queryInfo['fields']['rlucw_source_title'] ) ) {
 				$queryInfo['fields']['rlucw_source_title'] = 'real_last_update_cross_wiki.rlucw_source_title';
 			}
 
@@ -147,7 +178,7 @@ class RealLastUpdatePager extends TablePager {
 	/**
 	 * @inheritDoc
 	 */
-	public function getFieldNames() {
+	public function getFieldNames(): array {
 		$fields = [
 			'page_title' => $this->msg( 'reallastupdate-page' )->text(),
 			'real_last_update_timestamp' => $this->msg( 'reallastupdate-timestamp' )->text(),
@@ -165,14 +196,14 @@ class RealLastUpdatePager extends TablePager {
 	/**
 	 * @inheritDoc
 	 */
-	public function getDefaultSort() {
+	public function getDefaultSort(): string {
 		return 'real_last_update_timestamp';
 	}
 
 	/**
 	 * @inheritDoc
 	 */
-	public function isFieldSortable( $field ) {
+	public function isFieldSortable( $field ): bool {
 		return $field === 'real_last_update_timestamp' ||
 			   $field === 'regular_update_timestamp' ||
 			   $field === 'rlucw_source_timestamp';
@@ -181,7 +212,7 @@ class RealLastUpdatePager extends TablePager {
 	/**
 	 * @inheritDoc
 	 */
-	public function formatValue( $name, $value ) {
+	public function formatValue( $name, $value ): ?string {
 		$row = $this->mCurrentRow;
 
 		switch ( $name ) {
@@ -252,11 +283,9 @@ class RealLastUpdatePager extends TablePager {
 					if ( $sourceWiki ) {
 						// Create interwiki link: sourceWiki:PageTitle
 						$interwikiLink = $sourceWiki . ':' . $row->rlucw_source_title;
-						$services = MediaWikiServices::getInstance();
-						$titleParser = $services->getTitleParser();
 						try {
-							$title = $titleParser->parseTitle( $interwikiLink );
-						} catch ( \MalformedTitleException $e ) {
+							$title = $this->titleParser->parseTitle( $interwikiLink );
+						} catch ( MalformedTitleException $e ) {
 							// Fallback if title parsing fails
 							return $formattedDate;
 						}
@@ -277,7 +306,7 @@ class RealLastUpdatePager extends TablePager {
 	/**
 	 * @inheritDoc
 	 */
-	public function getDefaultQuery() {
+	public function getDefaultQuery(): array {
 		$defaultQuery = parent::getDefaultQuery();
 
 		if ( isset( $this->filterOptions['namespace'] ) ) {
@@ -304,11 +333,17 @@ class RealLastUpdatePager extends TablePager {
 		$body = parent::getStartBody();
 
 		// Prepare a location for the toggle button. It will be added by Javascript code
-		$toggleHTML = \Html::element(
+		$toggleHTML = Html::element(
 			'div',
 			[ 'class' => 'reallastupdate-toggle-container' ],
 		);
 
 		return $body . $toggleHTML;
+	}
+
+	/** @inheritDoc */
+	protected function getDefaultDirections(): bool {
+		// This is actually the default anyway, but we override it to ensure
+		return self::DIR_ASCENDING;
 	}
 }

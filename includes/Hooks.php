@@ -20,12 +20,10 @@ namespace MediaWiki\Extension\RealLastUpdate;
 
 use MediaWiki\Hook\OutputPageParserOutputHook;
 use MediaWiki\Installer\Hook\LoadExtensionSchemaUpdatesHook;
-use MediaWiki\MediaWikiServices;
 use MediaWiki\Preferences\Hook\GetPreferencesHook;
 use MediaWiki\Storage\Hook\PageSaveCompleteHook;
 use Parser;
 use User;
-use WikiMap;
 
 /**
  * Hooks for RealLastUpdate extension
