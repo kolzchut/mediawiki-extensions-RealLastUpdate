@@ -11,6 +11,7 @@ use MediaWiki\Extension\RealLastUpdate\RealLastUpdate;
 use MediaWiki\MediaWikiServices;
 use TitleFormatter;
 use TitleParser;
+use TitleValue;
 
 $IP = getenv( 'MW_INSTALL_PATH' ) ?: __DIR__ . '/../../../..';
 require_once "$IP/maintenance/Maintenance.php";
@@ -318,36 +319,66 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 	}
 
 	/**
-	 * Normalize a title to DB format (spaces to underscores)
+	 * Parse a title into namespace ID and DB key
 	 *
-	 * @param string $title Title to normalize
-	 * @return string Normalized title for DB operations
+	 * @param string $title Title to parse
+	 * @return array Array with 'ns' (namespace ID) and 'dbkey' (DB key) elements
 	 */
-	private function normalizeForDB( string $title ): string {
+	private function parseTitle( string $title ): array {
 		try {
-			// First try to parse using MediaWiki's TitleParser
 			$titleObj = $this->titleParser->parseTitle( $title );
-			return $titleObj->getDBkey();
+			return [
+				'ns' => $titleObj->getNamespace(),
+				'dbkey' => $titleObj->getDBkey(),
+				'text' => $titleObj->getText()
+			];
 		} catch ( \Exception $e ) {
-			// Fallback to manual normalization
-			return str_replace( ' ', '_', $title );
+			// If parsing fails, default to main namespace
+			return [
+				'ns' => 0,
+				'dbkey' => str_replace( ' ', '_', $title ),
+				'text' => $title
+			];
 		}
 	}
 
 	/**
-	 * Normalize a title to API format (underscores to spaces)
+	 * Normalize a title to DB format (spaces to underscores)
+	 * while preserving namespace information
 	 *
 	 * @param string $title Title to normalize
-	 * @return string Normalized title for API operations
+	 * @return array Normalized title info with 'ns' and 'dbkey' elements
 	 */
-	private function normalizeForAPI( string $title ): string {
+	private function normalizeForDB( string $title ): array {
+		return $this->parseTitle( $title );
+	}
+
+	/**
+	 * Normalize a title to API format (underscores to spaces)
+	 * while preserving namespace information
+	 *
+	 * @param string $title Title to normalize
+	 * @return array Normalized title info with 'ns', 'prefixed' and 'dbkey' elements
+	 */
+	private function normalizeForAPI( string $title ): array {
+		$parsed = $this->parseTitle( $title );
+
 		try {
-			// First try to parse using MediaWiki's TitleParser
-			$titleObj = $this->titleParser->parseTitle( $title, NS_MAIN );
-			return $this->titleFormatter->getPrefixedText( $titleObj );
+			$titleValue = new TitleValue( $parsed['ns'], $parsed['dbkey'] );
+			$prefixedText = $this->titleFormatter->getPrefixedText( $titleValue );
+
+			return [
+				'ns' => $parsed['ns'],
+				'dbkey' => $parsed['dbkey'],
+				'prefixed' => $prefixedText
+			];
 		} catch ( \Exception $e ) {
-			// Fallback to manual normalization
-			return str_replace( '_', ' ', $title );
+			// If formatting fails, use namespace 0 as fallback
+			return [
+				'ns' => 0,
+				'dbkey' => $parsed['dbkey'],
+				'prefixed' => $parsed['text']
+			];
 		}
 	}
 
@@ -372,15 +403,26 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 	) {
 		$result = [];
 		$debug = $this->hasOption( 'debug' );
+		$verbose = $this->hasOption( 'verbose' );
 
-		// Normalize titles for DB queries (spaces to underscores)
-		$dbTitles = [];
-		$titleMapping = []; // Maps DB title back to original title
+		// Group titles by namespace to reduce number of queries
+		$namespacedTitles = [];
+		$titleMapping = []; // Maps normalized lookup key back to original title
 
 		foreach ( $titles as $title ) {
-			$dbTitle = $this->normalizeForDB( $title );
-			$dbTitles[] = $dbTitle;
-			$titleMapping[$dbTitle] = $title;
+			$normalized = $this->normalizeForDB( $title );
+			$ns = $normalized['ns'];
+			$dbKey = $normalized['dbkey'];
+
+			// Group by namespace
+			if ( !isset( $namespacedTitles[$ns] ) ) {
+				$namespacedTitles[$ns] = [];
+			}
+			$namespacedTitles[$ns][] = $dbKey;
+
+			// Create a lookup key that includes namespace
+			$lookupKey = "{$ns}:{$dbKey}";
+			$titleMapping[$lookupKey] = $title;
 
 			// Initialize report data entry
 			$reportData[$title] = [
@@ -390,117 +432,173 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 				'redirect_target_page_id' => null
 			];
 
-			if ( $debug && $dbTitle !== $title ) {
-				$this->output( "  DB lookup: '$title' (normalized to '$dbTitle')\n" );
+			if ( $debug ) {
+				$displayTitle = $ns > 0 ? "NS{$ns}:{$dbKey}" : $dbKey;
+				$this->output( "  DB lookup: '$title' (normalized to '{$displayTitle}')\n" );
 			}
 		}
 
-		// First check for redirects
+		// First check for redirects - one query per namespace
 		$redirectTargets = [];
 		$redirectSources = [];
-		$originalTitleMap = []; // Maps DB redirect target to original title
+		$redirectTargetPages = [];
+		$redirectChains = []; // Track redirect chains by source ID
 
-		$redirectRes = $sourceDb->select(
-			[ 'page', 'redirect' ],
-			[ 'page_id', 'page_title', 'rd_title', 'rd_namespace' ],
-			[
-				'page_title' => $dbTitles,
-				'page_namespace' => 0,
-				'page_is_redirect' => 1
-			],
-			__METHOD__,
-			[],
-			[ 'redirect' => [ 'JOIN', 'rd_from = page_id' ] ]
-		);
+		foreach ( $namespacedTitles as $ns => $dbTitles ) {
+			$redirectRes = $sourceDb->select(
+				[ 'page', 'redirect' ],
+				[ 'page_id', 'page_title', 'rd_title', 'rd_namespace' ],
+				[
+					'page_title' => $dbTitles,
+					'page_namespace' => $ns,
+					'page_is_redirect' => 1
+				],
+				__METHOD__,
+				[],
+				[ 'redirect' => [ 'JOIN', 'rd_from = page_id' ] ]
+			);
 
-		foreach ( $redirectRes as $row ) {
-			$originalTitle = $titleMapping[$row->page_title] ?? $row->page_title;
-			$redirectTarget = $row->rd_title;
+			foreach ( $redirectRes as $row ) {
+				$lookupKey = "{$ns}:{$row->page_title}";
+				$originalTitle = $titleMapping[$lookupKey] ?? null;
+				if ( !$originalTitle ) continue;
 
-			// Use the display version of titles in debug output
-			$displayTarget = $this->normalizeForAPI( $redirectTarget );
-			$displayOriginal = $this->normalizeForAPI( $originalTitle );
+				$redirectSourceId = (int)$row->page_id;
+				$redirectTargetNs = (int)$row->rd_namespace;
+				$redirectTarget = $row->rd_title;
+				$redirectTargetKey = "{$redirectTargetNs}:{$redirectTarget}";
 
-			// Store redirect information
-			$redirectTargets[$originalTitle] = $redirectTarget;
-			$redirectSources[$redirectTarget] = $originalTitle;
-			$originalTitleMap[$redirectTarget] = $originalTitle;
-			$totalRedirects++;
+				// Format for display using TitleValue and TitleFormatter
+				$sourceValue = new TitleValue( $ns, $row->page_title );
+				$targetValue = new TitleValue( $redirectTargetNs, $redirectTarget );
 
-			// Update report data
-			if ( isset( $reportData[$originalTitle] ) ) {
-				$reportData[$originalTitle]['page_id'] = (int)$row->page_id;
-				$reportData[$originalTitle]['is_redirect'] = true;
-				$reportData[$originalTitle]['redirect_target'] = $displayTarget;
-			}
+				$displaySource = $this->titleFormatter->getPrefixedText( $sourceValue );
+				$displayTarget = $this->titleFormatter->getPrefixedText( $targetValue );
 
-			if ( $debug ) {
-				$this->output( "  Found redirect: '$displayOriginal' → '$displayTarget'\n" );
-			}
+				// Store redirect information
+				$redirectTargets[$originalTitle] = [
+					'ns' => $redirectTargetNs,
+					'dbkey' => $redirectTarget,
+					'source_id' => $redirectSourceId
+				];
+				$redirectSources[$redirectTargetKey] = $originalTitle;
+				$redirectChains[$redirectSourceId] = [
+					'target_ns' => $redirectTargetNs,
+					'target_dbkey' => $redirectTarget,
+					'source_title' => $originalTitle
+				];
+				$totalRedirects++;
 
-			// Add redirect targets to the list of titles to look up
-			// Normalize the redirect target title before adding it
-			if ( !in_array( $redirectTarget, $dbTitles ) ) {
-				$dbTitles[] = $redirectTarget;
-				// We don't need to add it to titleMapping because we'll handle it specially
+				// Update report data
+				if ( isset( $reportData[$originalTitle] ) ) {
+					$reportData[$originalTitle]['page_id'] = $redirectSourceId;
+					$reportData[$originalTitle]['is_redirect'] = true;
+					$reportData[$originalTitle]['redirect_target'] = $displayTarget;
+				}
 
 				if ( $debug ) {
-					$this->output( "  Added redirect target '$displayTarget' to lookup list\n" );
+					$this->output( "  Found redirect: '$displaySource' (ID: $redirectSourceId) → '$displayTarget'\n" );
+				}
+
+				// Add redirect target to the appropriate namespace group
+				if ( !isset( $namespacedTitles[$redirectTargetNs] ) ) {
+					$namespacedTitles[$redirectTargetNs] = [];
+				}
+				if ( !in_array( $redirectTarget, $namespacedTitles[$redirectTargetNs] ) ) {
+					$namespacedTitles[$redirectTargetNs][] = $redirectTarget;
+
+					if ( $debug ) {
+						$this->output( "  Added redirect target '$displayTarget' to lookup list\n" );
+					}
 				}
 			}
 		}
 
-		// Get page IDs for all titles (both original and redirect targets)
-		$res = $sourceDb->select(
-			'page',
-			[ 'page_id', 'page_title', 'page_is_redirect' ],
-			[ 'page_title' => $dbTitles, 'page_namespace' => 0 ],
-			__METHOD__
-		);
-
+		// Get page IDs for all titles (both original and redirect targets) - one query per namespace
 		$pageIds = [];
-		foreach ( $res as $row ) {
-			$pageTitle = $row->page_title;
-			$pageId = (int)$row->page_id;
-			$displayTitle = $this->normalizeForAPI( $pageTitle );
+		// New mapping: page ID to all titles that should receive its RLU data
+		$pageIdToTitles = [];
+		// Store target page IDs by source redirect ID
+		$redirectTargetPageIds = [];
 
-			// Check if this is a redirect target
-			if ( isset( $redirectSources[$pageTitle] ) ) {
-				// This page is a redirect target, map it to the original title
-				$sourceTitle = $redirectSources[$pageTitle];
-				if ( $debug ) {
-					$this->output( "  Mapping redirect target '{$pageTitle}' to source '{$sourceTitle}'\n" );
+		foreach ( $namespacedTitles as $ns => $dbTitles ) {
+			$res = $sourceDb->select(
+				'page',
+				[ 'page_id', 'page_title', 'page_namespace', 'page_is_redirect' ],
+				[ 'page_title' => $dbTitles, 'page_namespace' => $ns ],
+				__METHOD__
+			);
+
+			foreach ( $res as $row ) {
+				$pageTitle = $row->page_title;
+				$pageNs = (int)$row->page_namespace;
+				$pageId = (int)$row->page_id;
+				$isRedirect = (bool)$row->page_is_redirect;
+				$lookupKey = "{$pageNs}:{$pageTitle}";
+
+				// Format for display
+				$titleValue = new TitleValue( $pageNs, $pageTitle );
+				$displayTitle = $this->titleFormatter->getPrefixedText( $titleValue );
+
+				// Initialize the reverse mapping entry for this page ID
+				if ( !isset( $pageIdToTitles[$pageId] ) ) {
+					$pageIdToTitles[$pageId] = [];
 				}
 
-				// Use the original title (pre-normalization) for the result mapping
-				$originalTitle = $titleMapping[$sourceTitle] ?? $sourceTitle;
-
-				// Update report data for the source page
-				if ( isset( $reportData[$originalTitle] ) ) {
-					$reportData[$originalTitle]['redirect_target_page_id'] = $pageId;
-				}
-
-				if ( $debug ) {
-					$this->output( "  Redirect target '$displayTitle' has page ID $pageId\n" );
-				}
-
-				// For redirect targets, we'll map the page ID to the original title
-				// so we can look up RLU data for the target but associate it with the source
-				$pageIds[$originalTitle] = $pageId;
-			} else {
-				// Regular page, map to its original title if it exists
-				$originalTitle = $titleMapping[$pageTitle] ?? null;
-
-				if ( $originalTitle ) {
-					$pageIds[$originalTitle] = $pageId;
-
-					// Update report data
-					if ( isset( $reportData[$originalTitle] ) ) {
-						$reportData[$originalTitle]['page_id'] = $pageId;
-					}
+				// Check if this is a redirect target
+				if ( isset( $redirectSources[$lookupKey] ) ) {
+					// This page is a redirect target, map it to the original title
+					$sourceTitle = $redirectSources[$lookupKey];
 
 					if ( $debug ) {
-						$this->output( "  Page '$displayTitle' has page ID $pageId\n" );
+						$this->output( "  Mapping redirect target '{$displayTitle}' (ID: $pageId) to source '{$sourceTitle}'\n" );
+					}
+
+					// Find the source ID for this redirect
+					$sourceId = null;
+					foreach ( $redirectTargets as $title => $target ) {
+						if ( $title === $sourceTitle && $target['ns'] === $pageNs && $target['dbkey'] === $pageTitle ) {
+							$sourceId = $target['source_id'];
+							break;
+						}
+					}
+
+					if ( $sourceId ) {
+						$redirectTargetPageIds[$sourceId] = $pageId;
+
+						if ( $debug ) {
+							$this->output( "  Mapped redirect source ID $sourceId to target ID $pageId\n" );
+						}
+					}
+
+					// Update report data for the source page
+					if ( isset( $reportData[$sourceTitle] ) ) {
+						$reportData[$sourceTitle]['redirect_target_page_id'] = $pageId;
+					}
+
+					// For redirect targets, map the page ID to the original title
+					$pageIds[$sourceTitle] = $pageId;
+					$redirectTargetPages[$sourceTitle] = $pageId;
+
+					// Add this source title to the list of titles that should receive this page ID's RLU data
+					$pageIdToTitles[$pageId][] = $sourceTitle;
+				} else {
+					// Regular page, map to its original title if it exists
+					$originalTitle = $titleMapping[$lookupKey] ?? null;
+
+					if ( $originalTitle ) {
+						$pageIds[$originalTitle] = $pageId;
+						// Add this title to the list of titles that should receive this page ID's RLU data
+						$pageIdToTitles[$pageId][] = $originalTitle;
+
+						// Update report data
+						if ( isset( $reportData[$originalTitle] ) ) {
+							$reportData[$originalTitle]['page_id'] = $pageId;
+						}
+
+						if ( $debug ) {
+							$this->output( "  Page '$displayTitle' has page ID $pageId\n" );
+						}
 					}
 				}
 			}
@@ -510,33 +608,125 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 			return $result;
 		}
 
-		// Get real last update data for these pages
+		// For additional debugging - log the redirect chains we found
+		if ( $debug && !empty( $redirectTargetPageIds ) ) {
+			$this->output( "  Redirect source → target page ID mappings:\n" );
+			foreach ( $redirectTargetPageIds as $sourceId => $targetId ) {
+				$sourceTitle = $redirectChains[$sourceId]['source_title'] ?? "Unknown";
+				$this->output( "    Source ID: $sourceId ($sourceTitle) → Target ID: $targetId\n" );
+			}
+		}
+
+		// Get all page IDs we need to check for RLU data
+		$pageIdsToCheck = array_unique( array_merge(
+			array_values( $pageIds ),
+			array_values( $redirectTargetPageIds ),
+			array_keys( $redirectTargetPageIds )
+		) );
+
+		if ( $debug ) {
+			$this->output( "  Checking for RLU data on " . count( $pageIdsToCheck ) . " page IDs\n" );
+		}
+
+		// Get real last update data for these pages in a single query
 		$res = $sourceDb->select(
 			'real_last_update',
 			[ 'rlud_page_id', 'rlud_timestamp', 'rlud_rev_id' ],
-			[ 'rlud_page_id' => array_values( $pageIds ) ],
+			[ 'rlud_page_id' => $pageIdsToCheck ],
 			__METHOD__
 		);
 
+		// Now process the RLU data and assign it to all related titles
 		foreach ( $res as $row ) {
-			$pageId = (int)$row->rlud_page_id;
-			$pageTitle = array_search( $pageId, $pageIds );
+			$rluPageId = (int)$row->rlud_page_id;
+			$rluData = [
+				'rev_id' => $row->rlud_rev_id,
+				'timestamp' => $row->rlud_timestamp
+			];
 
-			if ( $pageTitle !== false ) {
-				$result[$pageTitle] = [
-					'rev_id' => $row->rlud_rev_id,
-					'timestamp' => $row->rlud_timestamp
-				];
+			if ( $debug ) {
+				$this->output( "  Found RLU data for page ID $rluPageId: " .
+					"rev={$row->rlud_rev_id}, ts={$row->rlud_timestamp}\n" );
+			}
 
-				// Check if this page was a redirect target
-				if ( isset( $redirectTargets[$pageTitle] ) ) {
-					$redirectsWithRLU++;
+			// Direct mapping - if this page ID has titles mapped to it
+			if ( isset( $pageIdToTitles[$rluPageId] ) && !empty( $pageIdToTitles[$rluPageId] ) ) {
+				foreach ( $pageIdToTitles[$rluPageId] as $titleToUpdate ) {
+					$result[$titleToUpdate] = $rluData;
+
+					// Check if this page was a redirect target and count it
+					if ( isset( $redirectTargetPages[$titleToUpdate] ) && $redirectTargetPages[$titleToUpdate] === $rluPageId ) {
+						$redirectsWithRLU++;
+					}
+
+					if ( $debug ) {
+						$this->output( "  Assigning RLU data to '$titleToUpdate' (ID: $rluPageId) - direct mapping\n" );
+					}
+				}
+			}
+
+			// Check if this is a redirect source with RLU data
+			if ( isset( $redirectTargetPageIds[$rluPageId] ) ) {
+				$targetPageId = $redirectTargetPageIds[$rluPageId];
+
+				// Find all titles associated with the target page ID
+				if ( isset( $pageIdToTitles[$targetPageId] ) && !empty( $pageIdToTitles[$targetPageId] ) ) {
+					foreach ( $pageIdToTitles[$targetPageId] as $titleToUpdate ) {
+						// Only add if not already assigned
+						if ( !isset( $result[$titleToUpdate] ) ) {
+							$result[$titleToUpdate] = $rluData;
+
+							if ( $debug ) {
+								$this->output( "  Assigning RLU data from redirect source ID $rluPageId to '$titleToUpdate' (target ID: $targetPageId)\n" );
+							}
+						}
+					}
 				}
 
-				if ( $debug ) {
-					$this->output( "  Found RLU data for '$pageTitle' (ID: $pageId): " .
-						"rev={$row->rlud_rev_id}, ts={$row->rlud_timestamp}\n" );
+				// Also make sure the source redirect's title gets the RLU data
+				if ( isset( $redirectChains[$rluPageId] ) ) {
+					$sourceTitle = $redirectChains[$rluPageId]['source_title'];
+					if ( !isset( $result[$sourceTitle] ) ) {
+						$result[$sourceTitle] = $rluData;
+						$redirectsWithRLU++;
+
+						if ( $debug ) {
+							$this->output( "  Assigning RLU data to redirect source '$sourceTitle' (ID: $rluPageId)\n" );
+						}
+					}
 				}
+			}
+
+			// Check if this is a redirect target with RLU data
+			$sourceIds = array_keys( $redirectTargetPageIds, $rluPageId );
+			if ( !empty( $sourceIds ) ) {
+				foreach ( $sourceIds as $sourceId ) {
+					// Find the source title for this ID
+					if ( isset( $redirectChains[$sourceId] ) ) {
+						$sourceTitle = $redirectChains[$sourceId]['source_title'];
+						if ( !isset( $result[$sourceTitle] ) ) {
+							$result[$sourceTitle] = $rluData;
+							$redirectsWithRLU++;
+
+							if ( $debug ) {
+								$this->output( "  Assigning RLU data from target ID $rluPageId to redirect source '$sourceTitle' (ID: $sourceId)\n" );
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Debug output for RLU results
+		if ( $debug ) {
+			$this->output( "  Final RLU data assignments:\n" );
+			foreach ( $result as $title => $data ) {
+				$pageId = $pageIds[$title] ?? 'unknown';
+				$isRedirect = isset( $redirectTargets[$title] ) ? 'Yes' : 'No';
+				$targetId = isset( $redirectTargets[$title] ) ? ($redirectTargetPages[$title] ?? 'unknown') : 'N/A';
+
+				$this->output( "    Title: $title (ID: $pageId, Redirect: $isRedirect, Target ID: $targetId)\n" );
+				$this->output( "      RLU data: rev={$data['rev_id']}, ts={$data['timestamp']}\n" );
 			}
 		}
 
@@ -553,7 +743,13 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 	 * @param array &$reportData Array to store report data
 	 * @return array Associative array of source data by title
 	 */
-	private function getSourceDataFromAPI( array $titles, string $sourceWiki, &$totalRedirects = 0, &$redirectsWithRLU = 0 ) {
+	private function getSourceDataFromAPI(
+		array $titles,
+		string $sourceWiki,
+		&$totalRedirects = 0,
+		&$redirectsWithRLU = 0,
+		&$reportData = []
+	) {
 		$result = [];
 		$apiUrl = RealLastUpdate::getConfigVar( 'RealLastUpdateSourceWikiApi' );
 		$verbose = $this->hasOption( 'verbose' );
@@ -588,11 +784,12 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 			// Map of original titles to API-normalized titles
 			$titleMapping = [];
 
-			// Normalize titles for API (underscores to spaces) and properly encode
+			// Normalize titles for API with proper namespace handling
 			$encodedTitles = [];
 			foreach ( $chunk as $title ) {
-				$apiTitle = $this->normalizeForAPI( $title );
-				$titleMapping[$apiTitle] = $title; // Map back to original format
+				$normalized = $this->normalizeForAPI( $title );
+				$apiTitle = $normalized['prefixed']; // Get the properly formatted prefixed title
+				$titleMapping[$apiTitle] = $title; // Map API title back to original
 				$encodedTitles[] = rawurlencode( $apiTitle );
 
 				if ( $debug && $apiTitle !== $title ) {
@@ -601,6 +798,7 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 			}
 
 			$titlesParam = implode( '|', $encodedTitles );
+			// Use the 'ids' parameter to ensure we get page IDs even for redirects
 			$url = $apiUrl . '?action=query&prop=reallastupdate&titles=' . $titlesParam . '&redirects=1&format=json';
 
 			if ( $debug ) {
@@ -633,6 +831,10 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 
 			// Build redirect map if redirects occurred
 			$redirectMap = [];
+			$redirectTargetPages = [];
+			$redirectSourceIds = []; // Track redirect source IDs
+			$redirectTargetIds = []; // Track redirect target IDs
+
 			if ( isset( $data['query']['redirects'] ) ) {
 				// Count the redirects in this batch
 				$totalRedirects += count( $data['query']['redirects'] );
@@ -643,21 +845,67 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 					$redirectMap[$from] = $to;
 
 					// Find original title
-					$originalTitle = $titleMapping[$from] ?? $from;
+					if ( isset( $titleMapping[$from] ) ) {
+						$originalTitle = $titleMapping[$from];
 
-					// Update report data
-					if ( isset( $reportData[$originalTitle] ) ) {
-						$reportData[$originalTitle]['is_redirect'] = true;
-						$reportData[$originalTitle]['redirect_target'] = $to;
-					}
+						// Update report data
+						if ( isset( $reportData[$originalTitle] ) ) {
+							$reportData[$originalTitle]['is_redirect'] = true;
+							$reportData[$originalTitle]['redirect_target'] = $to;
+						}
 
-					if ( $debug ) {
-						$this->output( "  Redirect: '$from' → '$to'\n" );
+						if ( $debug ) {
+							$this->output( "  Redirect: '$from' → '$to'\n" );
+						}
 					}
 				}
 			}
 
-			// Process the results
+			// Handle normalized titles from API response
+			$normalizationMap = [];
+			if ( isset( $data['query']['normalized'] ) ) {
+				foreach ( $data['query']['normalized'] as $norm ) {
+					$from = $norm['from'];
+					$to = $norm['to'];
+					$normalizationMap[$from] = $to;
+
+					if ( $debug ) {
+						$this->output( "  Normalized: '$from' → '$to'\n" );
+					}
+				}
+				}
+
+			// Create a mapping from page IDs to all titles that should receive that page's RLU data
+			$pageIdToTitles = [];
+			$titleToPageId = [];
+			$redirectSourceToTargetId = [];
+
+			// First pass: identify redirect relationships by page ID
+			foreach ( $data['query']['pages'] as $pageId => $pageData ) {
+				if ( $pageId < 0 ) continue; // Skip missing pages
+
+				$pageId = (int)$pageId;
+				$title = $pageData['title'];
+
+				// Check if this is a redirect target
+				foreach ( $redirectMap as $from => $to ) {
+					if ( $to === $title ) {
+						// This is a target, now find the source page ID
+						foreach ( $data['query']['pages'] as $sourceId => $sourceData ) {
+							if ( $sourceId > 0 && isset( $sourceData['title'] ) && $sourceData['title'] === $from ) {
+								$redirectSourceToTargetId[(int)$sourceId] = $pageId;
+
+								if ( $debug ) {
+									$this->output( "  Mapped redirect source ID $sourceId ($from) to target ID $pageId ($to)\n" );
+								}
+								break;
+							}
+						}
+					}
+				}
+			}
+
+			// Second pass: map all titles to their page IDs
 			foreach ( $data['query']['pages'] as $pageId => $pageData ) {
 				// Skip non-existent pages
 				if ( $pageId < 0 ) {
@@ -668,113 +916,179 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 				}
 
 				$title = $pageData['title'];
+				$pageId = (int)$pageId;
 				$processedTitles++;
 
-				// Find original title - if this is a redirect target, find the source
-				$redirectSource = array_search( $title, $redirectMap );
-				$originalTitle = null;
+				// Initialize the mapping for this page ID
+				if ( !isset( $pageIdToTitles[$pageId] ) ) {
+					$pageIdToTitles[$pageId] = [];
+				}
 
-				if ( $redirectSource !== false ) {
-					// This is a redirect target
-					$originalTitle = $titleMapping[$redirectSource] ?? $redirectSource;
+				// Find titles related to this page - first direct matches
+				if ( isset( $titleMapping[$title] ) ) {
+					$originalTitle = $titleMapping[$title];
+					$pageIdToTitles[$pageId][] = $originalTitle;
+					$titleToPageId[$originalTitle] = $pageId;
 
-					// Update report data for redirect target page ID
+					// Update report data
 					if ( isset( $reportData[$originalTitle] ) ) {
-						$reportData[$originalTitle]['redirect_target_page_id'] = (int)$pageId;
+						$reportData[$originalTitle]['page_id'] = $pageId;
 					}
-				} else {
-					// Regular page
-					$originalTitle = $titleMapping[$title] ?? null;
 
-					// Update report data for page ID
-					if ( $originalTitle && isset( $reportData[$originalTitle] ) ) {
-						$reportData[$originalTitle]['page_id'] = (int)$pageId;
+					if ( $debug ) {
+						$this->output( "  Direct mapping: '$title' to original '$originalTitle', page ID $pageId\n" );
 					}
 				}
 
-				// Get RLU data if available
-				if ( isset( $pageData['reallastupdate'] ) && $originalTitle ) {
-					$rlu = $pageData['reallastupdate'];
+				// Check for normalized titles
+				$preNormalizedTitle = array_search( $title, $normalizationMap );
+				if ( $preNormalizedTitle !== false && isset( $titleMapping[$preNormalizedTitle] ) ) {
+					$originalTitle = $titleMapping[$preNormalizedTitle];
+					if ( !in_array( $originalTitle, $pageIdToTitles[$pageId] ) ) {
+						$pageIdToTitles[$pageId][] = $originalTitle;
+						$titleToPageId[$originalTitle] = $pageId;
 
-					$result[$originalTitle] = [
+						// Update report data
+						if ( isset( $reportData[$originalTitle] ) ) {
+							$reportData[$originalTitle]['page_id'] = $pageId;
+						}
+
+						if ( $debug ) {
+							$this->output( "  Normalized mapping: '$preNormalizedTitle' → '$title' to original '$originalTitle', page ID $pageId\n" );
+						}
+					}
+				}
+
+				// Check for redirect targets
+				foreach ( $redirectMap as $from => $to ) {
+					if ( $to === $title && isset( $titleMapping[$from] ) ) {
+						$originalTitle = $titleMapping[$from];
+						if ( !in_array( $originalTitle, $pageIdToTitles[$pageId] ) ) {
+							$pageIdToTitles[$pageId][] = $originalTitle;
+							$titleToPageId[$originalTitle] = $pageId;
+							$redirectTargetPages[$originalTitle] = $pageId;
+
+							// Update report data
+							if ( isset( $reportData[$originalTitle] ) ) {
+								$reportData[$originalTitle]['redirect_target_page_id'] = $pageId;
+							}
+
+							if ( $debug ) {
+								$this->output( "  Redirect target mapping: '$from' → '$title' to original '$originalTitle', page ID $pageId\n" );
+							}
+						}
+					}
+				}
+			}
+
+			// Debug output for redirect mappings
+			if ( $debug && !empty( $redirectSourceToTargetId ) ) {
+				$this->output( "  API redirect source → target page ID mappings:\n" );
+				foreach ( $redirectSourceToTargetId as $sourceId => $targetId ) {
+					// Try to find the original title for this source ID
+					$sourceTitle = "Unknown";
+					foreach ( $pageIdToTitles[$sourceId] ?? [] as $title ) {
+						$sourceTitle = $title;
+						break;
+					}
+					$this->output( "    Source ID: $sourceId ($sourceTitle) → Target ID: $targetId\n" );
+				}
+			}
+
+			// Third pass to process RLU data and assign it to all related titles
+			foreach ( $data['query']['pages'] as $pageId => $pageData ) {
+				if ( $pageId < 0 ) continue;
+
+				$pageId = (int)$pageId;
+
+				// If this page has RLU data, assign it to all related titles
+				if ( isset( $pageData['reallastupdate'] ) ) {
+					$rlu = $pageData['reallastupdate'];
+					$rluData = [
 						'rev_id' => $rlu['revision'],
 						'timestamp' => $rlu['timestamp']
 					];
 
-					// Check if this was a redirect target
-					if ( $redirectSource !== false ) {
-						$redirectsWithRLU++;
+					if ( $debug ) {
+						$this->output( "  Found RLU data for page ID $pageId: " .
+							"rev={$rlu['revision']}, ts={$rlu['timestamp']}\n" );
 					}
 
-					if ( $debug ) {
-						$this->output( "  Found RLU data for '$originalTitle': rev={$rlu['revision']}, ts={$rlu['timestamp']}\n" );
+					// Direct mapping - if this page ID has titles mapped to it
+					if ( isset( $pageIdToTitles[$pageId] ) && !empty( $pageIdToTitles[$pageId] ) ) {
+						foreach ( $pageIdToTitles[$pageId] as $titleToUpdate ) {
+							$result[$titleToUpdate] = $rluData;
+
+							// Check if this page was a redirect target and count it
+							if ( isset( $redirectTargetPages[$titleToUpdate] ) && $redirectTargetPages[$titleToUpdate] === $pageId ) {
+								$redirectsWithRLU++;
+							}
+
+							if ( $debug ) {
+								$this->output( "  Assigning RLU data to '$titleToUpdate' (ID: $pageId) - direct mapping\n" );
+							}
+						}
 					}
-				} elseif ( $originalTitle && $verbose ) {
-					$this->output( "  No RLU data for '$originalTitle' in source wiki\n" );
+
+					// Check if this is a redirect source with RLU data
+					if ( isset( $redirectSourceToTargetId[$pageId] ) ) {
+						$targetPageId = $redirectSourceToTargetId[$pageId];
+
+						// Find all titles associated with the target page ID
+						if ( isset( $pageIdToTitles[$targetPageId] ) && !empty( $pageIdToTitles[$targetPageId] ) ) {
+							foreach ( $pageIdToTitles[$targetPageId] as $titleToUpdate ) {
+								// Only add if not already assigned
+								if ( !isset( $result[$titleToUpdate] ) ) {
+									$result[$titleToUpdate] = $rluData;
+
+									if ( $debug ) {
+										$this->output( "  Assigning RLU data from redirect source ID $pageId to '$titleToUpdate' (target ID: $targetPageId)\n" );
+									}
+								}
+							}
+						}
+					}
+
+					// Check if this is a redirect target with RLU data
+					$sourceIds = array_keys( $redirectSourceToTargetId, $pageId );
+					if ( !empty( $sourceIds ) ) {
+						foreach ( $sourceIds as $sourceId ) {
+							// Find all titles for this source ID
+							if ( isset( $pageIdToTitles[$sourceId] ) && !empty( $pageIdToTitles[$sourceId] ) ) {
+								foreach ( $pageIdToTitles[$sourceId] as $titleToUpdate ) {
+									if ( !isset( $result[$titleToUpdate] ) ) {
+										$result[$titleToUpdate] = $rluData;
+										$redirectsWithRLU++;
+
+										if ( $debug ) {
+											$this->output( "  Assigning RLU data from target ID $pageId to redirect source '$titleToUpdate' (ID: $sourceId)\n" );
+										}
+									}
+								}
+							}
+						}
+					}
+				} elseif ( $verbose && isset( $pageIdToTitles[$pageId] ) ) {
+					$titles = implode( "', '", $pageIdToTitles[$pageId] );
+					$this->output( "  No RLU data for page ID $pageId, which maps to titles: '$titles'\n" );
+				}
+			}
+
+			// Debug output for final RLU data assignments
+			if ( $debug ) {
+				$this->output( "  Final API RLU data assignments:\n" );
+				foreach ( $result as $title => $data ) {
+					$pageId = $titleToPageId[$title] ?? 'unknown';
+					$isRedirect = isset( $redirectMap[$title] ) ? 'Yes' : 'No';
+					$targetId = isset( $redirectTargetPages[$title] ) ? $redirectTargetPages[$title] : 'N/A';
+
+					$this->output( "    Title: $title (ID: $pageId, Redirect: $isRedirect, Target ID: $targetId)\n" );
+					$this->output( "      RLU data: rev={$data['rev_id']}, ts={$data['timestamp']}\n" );
 				}
 			}
 		}
 
 		return $result;
-	}
-
-	/**
-	 * Find the original title in our mapping, taking into account redirects and normalization
-	 *
-	 * @param string $title Current title from API response
-	 * @param array $titleMapping Mapping of API titles to original titles
-	 * @param array $redirectMap Map of redirects from->to
-	 * @param array $normalizationMap Map of normalized titles
-	 * @return string|false Original title or false if not found
-	 */
-	private function findOriginalTitle( $title, $titleMapping, $redirectMap, $normalizationMap ) {
-		$debug = $this->hasOption( 'debug' );
-
-		if ( $debug ) {
-			$this->output( "  Looking for original title for '$title'\n" );
-		}
-
-		// Direct match in title mapping
-		if ( isset( $titleMapping[$title] ) ) {
-			if ( $debug ) {
-				$this->output( "    Direct match: '$title' → '{$titleMapping[$title]}'\n" );
-			}
-			return $titleMapping[$title];
-		}
-
-		// Check if title was normalized by the API
-		$preNormalizedTitle = array_search( $title, $normalizationMap );
-		if ( $preNormalizedTitle !== false && isset( $titleMapping[$preNormalizedTitle] ) ) {
-			if ( $debug ) {
-				$this->output( "    Match via normalization: '$preNormalizedTitle' → '$title' → '{$titleMapping[$preNormalizedTitle]}'\n" );
-			}
-			return $titleMapping[$preNormalizedTitle];
-		}
-
-		// Check if title is a redirect target
-		$sourceTitle = array_search( $title, $redirectMap );
-		if ( $sourceTitle !== false && isset( $titleMapping[$sourceTitle] ) ) {
-			if ( $debug ) {
-				$this->output( "    Match via redirect: '$sourceTitle' → '$title' → '{$titleMapping[$sourceTitle]}'\n" );
-			}
-			return $titleMapping[$sourceTitle];
-		}
-
-		// Case-insensitive matching as last resort
-		foreach ( $titleMapping as $apiTitle => $origTitle ) {
-			if ( strtolower( $title ) === strtolower( $apiTitle ) ) {
-				if ( $debug ) {
-					$this->output( "    Case-insensitive match: '$title' → '$apiTitle' → '$origTitle'\n" );
-				}
-				return $origTitle;
-			}
-		}
-
-		// No match found
-		if ( $debug ) {
-			$this->output( "    No match found for '$title'\n" );
-		}
-		return false;
 	}
 }
 
