@@ -25,9 +25,9 @@ namespace MediaWiki\Extension\RealLastUpdate;
 
 use ExtensionRegistry;
 use IndexPager;
+use MediaWiki\MediaWikiServices;
 use TablePager;
 use TitleValue;
-use Linker;
 
 /**
  * TablePager for displaying pages with their real last update information
@@ -252,8 +252,16 @@ class RealLastUpdatePager extends TablePager {
 					if ( $sourceWiki ) {
 						// Create interwiki link: sourceWiki:PageTitle
 						$interwikiLink = $sourceWiki . ':' . $row->rlucw_source_title;
-						return Linker::linkKnown(
-							$interwikiLink,
+						$services = MediaWikiServices::getInstance();
+						$titleParser = $services->getTitleParser();
+						try {
+							$title = $titleParser->parseTitle( $interwikiLink );
+						} catch ( \MalformedTitleException $e ) {
+							// Fallback if title parsing fails
+							return $formattedDate;
+						}
+						return $this->getLinkRenderer()->makeKnownLink(
+							$title,
 							$formattedDate
 						);
 					}
