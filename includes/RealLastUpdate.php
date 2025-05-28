@@ -48,7 +48,7 @@ class RealLastUpdate {
 	 * @param int $db DB_PRIMARY/DB_REPLICA
 	 * @return IDatabase
 	 */
-	private static function getDB( int $db = DB_REPLICA ): IDatabase {
+	public static function getDB( int $db = DB_REPLICA ): IDatabase {
 		$loadBalancer = MediaWikiServices::getInstance()->getDBLoadBalancer();
 		return $loadBalancer->getConnection( $db );
 	}

@@ -40,7 +40,8 @@
 		"OutputPageParserOutput": "main",
 		"PageSaveComplete": "main",
 		"LoadExtensionSchemaUpdates": "main",
-		"GetPreferences": "main"
+		"GetPreferences": "main",
+		"ArticleDeleteComplete": "main"
 	},
 	"HookHandlers": {
 		"main": {

@@ -20,6 +20,7 @@ namespace MediaWiki\Extension\RealLastUpdate;
 
 use MediaWiki\Hook\OutputPageParserOutputHook;
 use MediaWiki\Installer\Hook\LoadExtensionSchemaUpdatesHook;
+use MediaWiki\Page\Hook\ArticleDeleteCompleteHook;
 use MediaWiki\Preferences\Hook\GetPreferencesHook;
 use MediaWiki\Storage\Hook\PageSaveCompleteHook;
 use Parser;
@@ -32,7 +33,8 @@ class Hooks implements
 	PageSaveCompleteHook,
 	OutputPageParserOutputHook,
 	LoadExtensionSchemaUpdatesHook,
-	GetPreferencesHook
+	GetPreferencesHook,
+	ArticleDeleteCompleteHook
 {
 	private const PROP_TIME = 'RealLastUpdateTimestamp';
 	private const PROP_REV = 'RealLastUpdateRevision';
@@ -113,8 +115,6 @@ class Hooks implements
 		}
 	}
 
-	// @todo handle PageDeleteCompleteHook as well
-
 	/**
 	 * Hook handler for PageSaveComplete
 	 *
@@ -173,5 +173,28 @@ class Hooks implements
 			'type' => 'api',
 			'default' => false
 		];
+	}
+
+	/**
+	 * Hook handler for ArticleDeleteComplete
+	 * Deletes orphaned real_last_update and real_last_update_cross_wiki records
+	 *
+	 * @inheritDoc
+	 */
+	public function onArticleDeleteComplete(
+		$wikiPage, $user, $reason, $id, $content, $logEntry, $archivedRevisionCount
+	) {
+		$pageId = $wikiPage->getId();
+		try {
+			$dbw = RealLastUpdate::getDB( DB_PRIMARY );
+			$dbw->delete( 'real_last_update', [ 'rlud_page_id' => $pageId ], __METHOD__ );
+			// Try to delete from cross-wiki table if it exists
+			if ( $dbw->tableExists( 'real_last_update_cross_wiki' ) ) {
+				$dbw->delete( 'real_last_update_cross_wiki', [ 'rlud_page_id' => $pageId ], __METHOD__ );
+			}
+		} catch ( \Exception $e ) {
+			\wfLogWarning( 'RealLastUpdate: Failed to clean up after article deletion for page ID ' . $pageId . ': ' . $e->getMessage() );
+		}
+		return true;
 	}
 }
