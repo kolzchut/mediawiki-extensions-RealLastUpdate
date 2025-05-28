@@ -22,6 +22,18 @@
 			"value": [ "bot" ],
 			"merge_strategy": "provide_default",
 			"description": "User groups to consider as bots"
+		},
+		"RealLastUpdateSourceWiki": {
+			"value": null,
+			"description": "Source wiki name"
+		},
+		"RealLastUpdateSourceWikiApi": {
+			"value": "https://he.example.org/w/api.php",
+			"description": "API URL for the source wiki"
+		},
+		"RealLastUpdateSourceWikiDb": {
+			"value": null,
+			"description": "Database identifier for direct access to source wiki database"
 		}
 	},
 	"Hooks": {

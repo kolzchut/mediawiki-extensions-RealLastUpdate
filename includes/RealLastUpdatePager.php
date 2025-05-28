@@ -26,7 +26,8 @@ namespace MediaWiki\Extension\RealLastUpdate;
 use ExtensionRegistry;
 use IndexPager;
 use TablePager;
-use Title;
+use TitleValue;
+use Linker;
 
 /**
  * TablePager for displaying pages with their real last update information
@@ -119,6 +120,27 @@ class RealLastUpdatePager extends TablePager {
 			$queryInfo['join_conds'] = array_merge( $queryInfo['join_conds'], $contentAreaJoin['join_conds'] );
 		}
 
+		// Only join with cross-wiki table if we're not on the source wiki
+		if ( !RealLastUpdate::isSourceWiki() ) {
+			$crossWikiJoin = RealLastUpdate::getCrossWikiJoin();
+			$queryInfo['tables'] = array_merge( $queryInfo['tables'], $crossWikiJoin['tables'] );
+			$queryInfo['fields'] = array_merge( $queryInfo['fields'], $crossWikiJoin['fields'] );
+			$queryInfo['join_conds'] = array_merge( $queryInfo['join_conds'], $crossWikiJoin['join_conds'] );
+
+			// Explicitly include rlucw_source_timestamp and rlucw_source_title in the fields
+			// to ensure they're available for sorting and display
+			if (!isset($queryInfo['fields']['rlucw_source_timestamp'])) {
+				$queryInfo['fields']['rlucw_source_timestamp'] = 'real_last_update_cross_wiki.rlucw_source_timestamp';
+			}
+			if (!isset($queryInfo['fields']['rlucw_source_title'])) {
+				$queryInfo['fields']['rlucw_source_title'] = 'real_last_update_cross_wiki.rlucw_source_title';
+			}
+
+			// Add to GROUP BY to avoid SQL errors
+			$queryInfo['options']['GROUP BY'][] = 'real_last_update_cross_wiki.rlucw_source_timestamp';
+			$queryInfo['options']['GROUP BY'][] = 'real_last_update_cross_wiki.rlucw_source_title';
+		}
+
 		return $queryInfo;
 	}
 
@@ -126,11 +148,18 @@ class RealLastUpdatePager extends TablePager {
 	 * @inheritDoc
 	 */
 	public function getFieldNames() {
-		return [
+		$fields = [
 			'page_title' => $this->msg( 'reallastupdate-page' )->text(),
 			'real_last_update_timestamp' => $this->msg( 'reallastupdate-timestamp' )->text(),
 			'regular_update_timestamp' => $this->msg( 'reallastupdate-regular-timestamp' )->text(),
 		];
+
+		// Only show source wiki column if we're not on the source wiki
+		if ( !RealLastUpdate::isSourceWiki() ) {
+			$fields['rlucw_source_timestamp'] = $this->msg( 'reallastupdate-source-timestamp' )->text();
+		}
+
+		return $fields;
 	}
 
 	/**
@@ -144,7 +173,9 @@ class RealLastUpdatePager extends TablePager {
 	 * @inheritDoc
 	 */
 	public function isFieldSortable( $field ) {
-		return $field === 'real_last_update_timestamp' || $field === 'regular_update_timestamp';
+		return $field === 'real_last_update_timestamp' ||
+			   $field === 'regular_update_timestamp' ||
+			   $field === 'rlucw_source_timestamp';
 	}
 
 	/**
@@ -155,8 +186,8 @@ class RealLastUpdatePager extends TablePager {
 
 		switch ( $name ) {
 			case 'page_title':
-				$title = Title::makeTitle( $row->page_namespace, $row->page_title );
-				return $this->getLinkRenderer()->makeLink( $title );
+				$titleValue = TitleValue::tryNew( (int)$row->page_namespace, $row->page_title );
+				return $this->getLinkRenderer()->makeKnownLink( $titleValue );
 
 			case 'real_last_update_timestamp':
 				if ( !$value ) {
@@ -164,16 +195,23 @@ class RealLastUpdatePager extends TablePager {
 				}
 
 				$lang = $this->getLanguage();
-				$formatted = $lang->userTimeAndDate( $value, $this->getUser() );
+				$formattedDate = $lang->userTimeAndDate( $value, $this->getUser() );
 
 				// If we have a revision ID, link to the diff
 				if ( $row->real_last_update_revid ) {
-					$title = Title::makeTitle( $row->page_namespace, $row->page_title );
-					$url = $title->getLocalURL( [ 'oldid' => $row->real_last_update_revid ] );
-					return \Linker::makeExternalLink( $url, $formatted );
+					$titleValue = TitleValue::tryNew( (int)$row->page_namespace, $row->page_title );
+					return $this->getLinkRenderer()->makeKnownLink(
+						$titleValue,
+						$formattedDate,
+						[],
+						[
+							'oldid' => $row->real_last_update_revid,
+							'action' => 'diff'
+						]
+					);
 				}
 
-				return $formatted;
+				return $formattedDate;
 
 			case 'regular_update_timestamp':
 				if ( !$value ) {
@@ -181,13 +219,7 @@ class RealLastUpdatePager extends TablePager {
 				}
 
 				$lang = $this->getLanguage();
-				$formattedDate = $lang->timeanddate( $value, true );
-				// If we have a revision ID, link to the diff
-				if ( $row->regular_update_revid ) {
-					$title = Title::makeTitle( $row->page_namespace, $row->page_title );
-					$url = $title->getLocalURL( [ 'oldid' => $row->regular_update_revid ] );
-					$formattedDate = \Linker::makeExternalLink( $url, $formattedDate );
-				}
+				$formattedDate = $lang->userTimeAndDate( $value, $this->getUser() );
 
 				// Check if the values are identical and we're not showing all dates
 				if ( $row->real_last_update_timestamp &&
@@ -205,6 +237,29 @@ class RealLastUpdatePager extends TablePager {
 				} else {
 					return $formattedDate;
 				}
+
+			case 'rlucw_source_timestamp':
+				if ( !$value ) {
+					return $this->msg( 'reallastupdate-no-data' )->escaped();
+				}
+
+				$lang = $this->getLanguage();
+				$formattedDate = $lang->userTimeAndDate( $value, $this->getUser() );
+
+				// If we have source title, create an interwiki link to the source page
+				if ( isset( $row->rlucw_source_title ) && $row->rlucw_source_title ) {
+					$sourceWiki = RealLastUpdate::getConfigVar( 'RealLastUpdateSourceWiki' );
+					if ( $sourceWiki ) {
+						// Create interwiki link: sourceWiki:PageTitle
+						$interwikiLink = $sourceWiki . ':' . $row->rlucw_source_title;
+						return Linker::linkKnown(
+							$interwikiLink,
+							$formattedDate
+						);
+					}
+				}
+
+				return $formattedDate;
 
 			default:
 				return $value;

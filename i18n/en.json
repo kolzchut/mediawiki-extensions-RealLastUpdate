@@ -21,5 +21,8 @@
 	"reallastupdate-no-data": "No human edits",
 	"reallastupdate-no-regular-data": "No edits",
 	"reallastupdate-identical-to-human": "Identical to human edit",
-	"reallastupdate-show-all-dates": "Show all dates"
+	"reallastupdate-show-all-dates": "Show all dates",
+	"reallastupdate-source-timestamp": "Source wiki last human edit",
+	"reallastupdate-no-source-data": "No source wiki information",
+	"reallastupdate-source-update": "Update from $1:$2 on $3"
 }

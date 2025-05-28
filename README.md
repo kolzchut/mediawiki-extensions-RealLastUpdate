@@ -58,6 +58,16 @@ The extension uses a dedicated database table called `real_last_update` to store
 - `rlud_rev_id`: The revision ID of the last human edit
 - `rlud_timestamp`: The timestamp of the last human edit
 
+### Cross-Wiki Support
+
+When using this extension across multiple wikis, it can track and display last update information from a source wiki. 
+For this functionality to work properly:
+
+1. Configure `$wgRealLastUpdateSourceWiki` to specify the source wiki name
+2. Ensure an interwiki prefix is set up for the source wiki that matches the name in `$wgRealLastUpdateSourceWiki`
+3. The special page will display and allow sorting by the source wiki's last update timestamp
+4. The timestamp will link to the corresponding page on the source wiki using the interwiki link
+
 ### Example API Response
 
 ```json

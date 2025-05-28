@@ -21,5 +21,8 @@
 	"reallastupdate-no-data": "אין עריכות אנושיות",
 	"reallastupdate-no-regular-data": "אין עריכות",
 	"reallastupdate-identical-to-human": "זהה לעריכה האנושית",
-	"reallastupdate-show-all-dates": "הצג את כל התאריכים"
+	"reallastupdate-show-all-dates": "הצג את כל התאריכים",
+	"reallastupdate-source-timestamp": "עריכה אנושית אחרונה במקור",
+	"reallastupdate-no-source-data": "אין מידע על מקור",
+	"reallastupdate-source-update": "עדכון מ-$1:$2 בתאריך $3"
 }

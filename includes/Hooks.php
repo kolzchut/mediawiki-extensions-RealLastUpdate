@@ -23,10 +23,9 @@ use MediaWiki\Installer\Hook\LoadExtensionSchemaUpdatesHook;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Preferences\Hook\GetPreferencesHook;
 use MediaWiki\Storage\Hook\PageSaveCompleteHook;
-use MediaWiki\User\UserIdentity;
 use Parser;
-use ParserOutput;
 use User;
+use WikiMap;
 
 /**
  * Hooks for RealLastUpdate extension
@@ -154,6 +153,12 @@ class Hooks implements
 		$extDir = __DIR__ . '/..';
 		$updater->addExtensionTable( 'real_last_update',
 			"$extDir/sql/tables.sql" );
+
+		// Only add the cross-wiki table if this is not the source wiki
+		if ( !RealLastUpdate::isSourceWiki() ) {
+			$updater->addExtensionTable( 'real_last_update_cross_wiki',
+				$extDir . '/sql/real_last_update_cross_wiki.sql' );
+		}
 	}
 
 	/**
@@ -172,4 +177,3 @@ class Hooks implements
 		];
 	}
 }
-

@@ -19,10 +19,12 @@
 
 namespace MediaWiki\Extension\RealLastUpdate;
 
+use Exception;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Revision\RevisionRecord;
 use MediaWiki\User\UserIdentity;
 use Wikimedia\Rdbms\IDatabase;
+use WikiPage;
 
 class RealLastUpdate {
 	private const TABLE_NAME = 'real_last_update';
@@ -90,23 +92,27 @@ class RealLastUpdate {
 			return self::findLastRealRevision( $pageId );
 		}
 
-		$dbr = self::getDB();
+		try {
+			$dbr = self::getDB();
 
-		$row = $dbr->selectRow(
-			self::TABLE_NAME,
-			[ 'rlud_rev_id', 'rlud_timestamp' ],
-			[ 'rlud_page_id' => $pageId ],
-			__METHOD__
-		);
+			$row = $dbr->selectRow(
+				self::TABLE_NAME,
+				[ 'rlud_rev_id', 'rlud_timestamp' ],
+				[ 'rlud_page_id' => $pageId ],
+				__METHOD__
+			);
 
-		if ( $row ) {
-			return [
-				'rev_id' => (int)$row->rlud_rev_id,
-				'timestamp' => $row->rlud_timestamp
-			];
+			if ( $row ) {
+				return [
+					'rev_id' => (int)$row->rlud_rev_id,
+					'timestamp' => $row->rlud_timestamp
+				];
+			}
+		} catch ( Exception $e ) {
+			wfLogWarning( 'Error retrieving last real edit: ' . $e->getMessage() );
 		}
 
-		// No saved data, let's find it from revision history
+		// No saved data or error occurred, let's find it from revision history
 		return self::findLastRealRevision( $pageId );
 	}
 
@@ -117,44 +123,64 @@ class RealLastUpdate {
 	 * @return array|false Array with 'rev_id' and 'timestamp', or false if not found
 	 */
 	public static function findLastRealRevision( int $pageId ) {
-		$dbr = self::getDB();
-		$actorsToIgnore = self::getIgnoredActorIds();
+		try {
+			$dbr = self::getDB();
+			$actorsToIgnore = self::getIgnoredActorIds();
 
-		// Skip redirect pages
-		$wikiPage = \WikiPage::newFromID( $pageId );
-		if ( $wikiPage && $wikiPage->isRedirect() ) {
+			// Skip redirect pages
+			$wikiPage = WikiPage::newFromID( $pageId );
+			if ( !$wikiPage ) {
+				wfLogWarning( "RealLastUpdate: Failed to load WikiPage for ID: $pageId" );
+				return false;
+			}
+
+			if ( $wikiPage->isRedirect() ) {
+				return false;
+			}
+
+			// Query for the most recent revision where the actor is not in our ignored list
+			try {
+				$revisionStore = MediaWikiServices::getInstance()->getRevisionStore();
+				$queryInfo = $revisionStore->getQueryInfo();
+				$conds = [
+					'rev_page' => $pageId
+				];
+
+				if ( !empty( $actorsToIgnore ) ) {
+					$conds[] = 'rev_actor NOT IN (' . $dbr->makeList( $actorsToIgnore ) . ')';
+				}
+
+				$row = $dbr->selectRow(
+					$queryInfo['tables'],
+					[ 'rev_id', 'rev_timestamp' ],
+					$conds,
+					__METHOD__,
+					[ 'ORDER BY' => 'rev_timestamp DESC' ],
+					$queryInfo['joins']
+				);
+
+				if ( $row ) {
+					$result = [
+						'rev_id' => (int)$row->rev_id,
+						'timestamp' => $row->rev_timestamp
+					];
+
+					try {
+						self::updateLastRealEdit( $pageId, $result['rev_id'], $result['timestamp'] );
+					} catch ( Exception $e ) {
+						wfLogWarning( 'RealLastUpdate: Failed to update last real edit: ' . $e->getMessage() );
+						// Continue despite update failure, as we still have the result
+					}
+
+					return $result;
+				}
+			} catch ( Exception $e ) {
+				wfLogWarning( 'RealLastUpdate: Database query error in findLastRealRevision: ' . $e->getMessage() );
+				return false;
+			}
+		} catch ( Exception $e ) {
+			wfLogWarning( 'RealLastUpdate: Error in findLastRealRevision: ' . $e->getMessage() );
 			return false;
-		}
-
-		// Query for the most recent revision where the actor is not in our ignored list
-		$revisionStore = MediaWikiServices::getInstance()->getRevisionStore();
-		$queryInfo = $revisionStore->getQueryInfo();
-		$conds = [
-			'rev_page' => $pageId
-		];
-
-		if ( !empty( $actorsToIgnore ) ) {
-			$conds[] = 'rev_actor NOT IN (' . $dbr->makeList( $actorsToIgnore ) . ')';
-		}
-
-		$row = $dbr->selectRow(
-			$queryInfo['tables'],
-			[ 'rev_id', 'rev_timestamp' ],
-			$conds,
-			__METHOD__,
-			[ 'ORDER BY' => 'rev_timestamp DESC' ],
-			$queryInfo['joins']
-		);
-
-		if ( $row ) {
-			$result = [
-				'rev_id' => (int)$row->rev_id,
-				'timestamp' => $row->rev_timestamp
-			];
-
-			self::updateLastRealEdit( $pageId, $result['rev_id'], $result['timestamp'] );
-
-			return $result;
 		}
 
 		return false;
@@ -256,5 +282,94 @@ class RealLastUpdate {
 			'join_conds' => $joins
 		];
 	}
-}
 
+	/**
+	 * Get cross-wiki real last update information
+	 *
+	 * @param int $pageId The local page ID
+	 * @return array|false Array with source information or false if not found
+	 */
+	public static function getCrossWikiRealLastUpdate( int $pageId ) {
+		$dbr = self::getDB();
+
+		$row = $dbr->selectRow(
+			'real_last_update_cross_wiki',
+			[
+				'rlucw_source_title',
+				'rlucw_source_timestamp',
+				'rlucw_source_revid'
+			],
+			[ 'rlucw_page_id' => $pageId ],
+			__METHOD__
+		);
+
+		if ( $row ) {
+			return [
+				'source_title' => $row->rlucw_source_title,
+				'timestamp' => $row->rlucw_source_timestamp,
+				'rev_id' => (int)$row->rlucw_source_revid
+			];
+		}
+
+		return false;
+	}
+
+	/**
+	 * Get database connection to a foreign wiki
+	 *
+	 * @param string $wikiId The wiki ID
+	 * @return \Wikimedia\Rdbms\IDatabase|false Database connection or false
+	 */
+	public static function getForeignWikiDB( string $wikiId ) {
+		try {
+			$services = MediaWikiServices::getInstance();
+			$lbFactory = $services->getDBLoadBalancerFactory();
+
+			// Check if foreign wiki DB is configured
+			$foreignDb = self::getConfigVar( 'RealLastUpdateSourceWikiDb' );
+			if ( !$foreignDb ) {
+				return false;
+			}
+			// Get connection to foreign wiki
+			$lb = $lbFactory->getMainLB( $foreignDb );
+			return $lb->getConnectionRef( DB_REPLICA, [], $foreignDb );
+		} catch ( Exception $e ) {
+			wfLogWarning( 'Failed to get foreign wiki database connection: ' . $e->getMessage() );
+			return false;
+		}
+	}
+
+	/**
+	 * Get the join condition for cross-wiki data
+	 *
+	 * @return array Join condition for cross-wiki data
+	 */
+	public static function getCrossWikiJoin() {
+		return [
+			'tables' => [ 'real_last_update_cross_wiki' ],
+			'fields' => [
+				'rlucw_source_title' => 'real_last_update_cross_wiki.rlucw_source_title',
+				'rlucw_source_timestamp' => 'real_last_update_cross_wiki.rlucw_source_timestamp',
+				'rlucw_source_revid' => 'real_last_update_cross_wiki.rlucw_source_revid'
+			],
+			'join_conds' => [
+				'real_last_update_cross_wiki' => [ 'LEFT JOIN', 'page_id = real_last_update_cross_wiki.rlucw_page_id' ]
+			]
+		];
+	}
+
+	/**
+	 * Check if the current wiki is the source wiki
+	 *
+	 * @return bool True if this wiki is the source wiki, false otherwise
+	 */
+	public static function isSourceWiki(): bool {
+		$sourceWiki = self::getConfigVar( 'RealLastUpdateSourceWiki' );
+		$currentWikiId = self::getConfigVar( 'Wiki' );
+
+		// This is a source wiki if:
+		// - RealLastUpdateSourceWiki is false (this is the only/main wiki), or
+		// - RealLastUpdateSourceWiki equals the current wiki ID
+		return $sourceWiki === false || $sourceWiki === $currentWikiId;
+	}
+}
