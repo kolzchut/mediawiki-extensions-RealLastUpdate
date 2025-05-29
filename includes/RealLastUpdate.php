@@ -89,31 +89,41 @@ class RealLastUpdate {
 	 */
 	public static function getLastRealEdit( int $pageId, bool $forceRefresh = false ) {
 		if ( $forceRefresh ) {
-			return self::findLastRealRevision( $pageId );
-		}
-
-		try {
-			$dbr = self::getDB();
-
-			$row = $dbr->selectRow(
-				self::TABLE_NAME,
-				[ 'rlud_rev_id', 'rlud_timestamp' ],
-				[ 'rlud_page_id' => $pageId ],
-				__METHOD__
-			);
-
-			if ( $row ) {
-				return [
-					'rev_id' => (int)$row->rlud_rev_id,
-					'timestamp' => $row->rlud_timestamp
-				];
+			$localData = self::findLastRealRevision( $pageId );
+		} else {
+			try {
+				$dbr = self::getDB();
+				$row = $dbr->selectRow(
+					self::TABLE_NAME,
+					[ 'rlud_rev_id', 'rlud_timestamp' ],
+					[ 'rlud_page_id' => $pageId ],
+					__METHOD__
+				);
+				if ( $row ) {
+					$localData = [
+						'rev_id' => (int)$row->rlud_rev_id,
+						'timestamp' => $row->rlud_timestamp
+					];
+				} else {
+					$localData = self::findLastRealRevision( $pageId );
+				}
+			} catch ( Exception $e ) {
+				wfLogWarning( 'Error retrieving last real edit: ' . $e->getMessage() );
+				$localData = self::findLastRealRevision( $pageId );
 			}
-		} catch ( Exception $e ) {
-			wfLogWarning( 'Error retrieving last real edit: ' . $e->getMessage() );
 		}
 
-		// No saved data or error occurred, let's find it from revision history
-		return self::findLastRealRevision( $pageId );
+		 // Only look for source RLU data if local data exists and this is not the source wiki
+		if ( $localData && !self::isSourceWiki() ) {
+			$sourceData = self::getCrossWikiRealLastUpdate( $pageId );
+			if ( $sourceData ) {
+				$localData['source_rev_id'] = $sourceData['rev_id'] ?? null;
+				$localData['source_timestamp'] = $sourceData['timestamp'] ?? null;
+				$localData['source_title'] = $sourceData['source_title'] ?? null;
+			}
+		}
+
+		return $localData;
 	}
 
 	/**
