@@ -35,3 +35,9 @@
 .tablesorter td:nth-child(3) {
 	width: 25%;
 }
+
+.TablePager_col_rlud_diff_days {
+	text-align: right;
+	/* @noflip */
+	direction: ltr;
+}

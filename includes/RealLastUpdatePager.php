@@ -106,9 +106,10 @@ class RealLastUpdatePager extends TablePager {
 				'page_id',
 				'page_namespace',
 				'page_title',
-				'real_last_update_timestamp' => 'real_last_update.rlud_timestamp',
+				// Use simple keys for all computed fields
+				'rlud_timestamp' => 'real_last_update.rlud_timestamp',
 				'real_last_update_revid' => 'real_last_update.rlud_rev_id',
-				'regular_update_timestamp' => 'MAX(revision.rev_timestamp)',
+				'rev_timestamp' => 'MAX(revision.rev_timestamp)',
 				'regular_update_revid' => 'MAX(revision.rev_id)',
 			],
 			'conds' => [
@@ -158,16 +159,14 @@ class RealLastUpdatePager extends TablePager {
 			$queryInfo['fields'] = array_merge( $queryInfo['fields'], $crossWikiJoin['fields'] );
 			$queryInfo['join_conds'] = array_merge( $queryInfo['join_conds'], $crossWikiJoin['join_conds'] );
 
-			// Explicitly include rlucw_source_timestamp and rlucw_source_title in the fields
-			// to ensure they're available for sorting and display
 			if ( !isset( $queryInfo['fields']['rlucw_source_timestamp'] ) ) {
 				$queryInfo['fields']['rlucw_source_timestamp'] = 'real_last_update_cross_wiki.rlucw_source_timestamp';
 			}
 			if ( !isset( $queryInfo['fields']['rlucw_source_title'] ) ) {
 				$queryInfo['fields']['rlucw_source_title'] = 'real_last_update_cross_wiki.rlucw_source_title';
 			}
-
-			// Add to GROUP BY to avoid SQL errors
+			 // Use a simple key for the computed field
+			$queryInfo['fields']['rlud_diff_days'] = "IF(real_last_update.rlud_timestamp IS NOT NULL AND real_last_update_cross_wiki.rlucw_source_timestamp IS NOT NULL, DATEDIFF(STR_TO_DATE(real_last_update_cross_wiki.rlucw_source_timestamp, '%Y%m%d%H%i%S'), STR_TO_DATE(real_last_update.rlud_timestamp, '%Y%m%d%H%i%S')), NULL)";
 			$queryInfo['options']['GROUP BY'][] = 'real_last_update_cross_wiki.rlucw_source_timestamp';
 			$queryInfo['options']['GROUP BY'][] = 'real_last_update_cross_wiki.rlucw_source_title';
 		}
@@ -181,13 +180,14 @@ class RealLastUpdatePager extends TablePager {
 	public function getFieldNames(): array {
 		$fields = [
 			'page_title' => $this->msg( 'reallastupdate-page' )->text(),
-			'real_last_update_timestamp' => $this->msg( 'reallastupdate-timestamp' )->text(),
-			'regular_update_timestamp' => $this->msg( 'reallastupdate-regular-timestamp' )->text(),
+			'rlud_timestamp' => $this->msg( 'reallastupdate-timestamp' )->text(),
+			'rev_timestamp' => $this->msg( 'reallastupdate-regular-timestamp' )->text(),
 		];
 
-		// Only show source wiki column if we're not on the source wiki
+		// Only show source wiki and diff columns if we're not on the source wiki
 		if ( !RealLastUpdate::isSourceWiki() ) {
 			$fields['rlucw_source_timestamp'] = $this->msg( 'reallastupdate-source-timestamp' )->text();
+			$fields['rlud_diff_days'] = $this->msg( 'reallastupdate-diff-days' )->text();
 		}
 
 		return $fields;
@@ -197,16 +197,21 @@ class RealLastUpdatePager extends TablePager {
 	 * @inheritDoc
 	 */
 	public function getDefaultSort(): string {
-		return 'real_last_update_timestamp';
+		return 'rlud_timestamp';
 	}
 
 	/**
 	 * @inheritDoc
 	 */
 	public function isFieldSortable( $field ): bool {
-		return $field === 'real_last_update_timestamp' ||
-			   $field === 'regular_update_timestamp' ||
-			   $field === 'rlucw_source_timestamp';
+		// Only allow sorting by diff column if not on source wiki
+		if ( RealLastUpdate::isSourceWiki() && $field === 'rlud_diff_days' ) {
+			return false;
+		}
+		return $field === 'rlud_timestamp' ||
+			   $field === 'rev_timestamp' ||
+			   $field === 'rlucw_source_timestamp' ||
+			   $field === 'rlud_diff_days';
 	}
 
 	/**
@@ -214,13 +219,12 @@ class RealLastUpdatePager extends TablePager {
 	 */
 	public function formatValue( $name, $value ): ?string {
 		$row = $this->mCurrentRow;
-
 		switch ( $name ) {
 			case 'page_title':
 				$titleValue = TitleValue::tryNew( (int)$row->page_namespace, $row->page_title );
 				return $this->getLinkRenderer()->makeKnownLink( $titleValue );
 
-			case 'real_last_update_timestamp':
+			case 'rlud_timestamp':
 				if ( !$value ) {
 					return $this->msg( 'reallastupdate-no-data' )->escaped();
 				}
@@ -244,7 +248,7 @@ class RealLastUpdatePager extends TablePager {
 
 				return $formattedDate;
 
-			case 'regular_update_timestamp':
+			case 'rev_timestamp':
 				if ( !$value ) {
 					return $this->msg( 'reallastupdate-no-regular-data' )->escaped();
 				}
@@ -253,8 +257,8 @@ class RealLastUpdatePager extends TablePager {
 				$formattedDate = $lang->userTimeAndDate( $value, $this->getUser() );
 
 				// Check if the values are identical and we're not showing all dates
-				if ( $row->real_last_update_timestamp &&
-					$value === $row->real_last_update_timestamp ) {
+				if ( $row->rlud_timestamp &&
+					$value === $row->rlud_timestamp ) {
 
 					// Create container with both spans for identical timestamps
 					return '<div class="reallastupdate-container">' .
@@ -270,6 +274,10 @@ class RealLastUpdatePager extends TablePager {
 				}
 
 			case 'rlucw_source_timestamp':
+				if ( RealLastUpdate::isSourceWiki() ) {
+					// If we're on the source wiki, we don't show this column
+					return null;
+				}
 				if ( !$value ) {
 					return $this->msg( 'reallastupdate-no-data' )->escaped();
 				}
@@ -297,6 +305,16 @@ class RealLastUpdatePager extends TablePager {
 				}
 
 				return $formattedDate;
+
+			case 'rlud_diff_days':
+				if ( RealLastUpdate::isSourceWiki() ) {
+					// If we're on the source wiki, we don't show this column
+					return null;
+				}
+				if ( $value === null || $value === '' ) {
+					return $this->msg( 'reallastupdate-no-diff-days' )->escaped();
+				}
+				return $this->msg( 'reallastupdate-diff-days-value', $value )->escaped();
 
 			default:
 				return $value;
@@ -345,5 +363,56 @@ class RealLastUpdatePager extends TablePager {
 	protected function getDefaultDirections(): bool {
 		// This is actually the default anyway, but we override it to ensure
 		return self::DIR_ASCENDING;
+	}
+
+	/**
+	 * Override buildQueryInfo to inject HAVING for computed fields when paging and remove from WHERE
+	 */
+	protected function buildQueryInfo( $offset, $limit, $order ) {
+		list( $tables, $fields, $conds, $fname, $options, $join_conds ) = parent::buildQueryInfo( $offset, $limit, $order );
+
+		// Only add HAVING for rlud_diff_days if needed
+		if ( isset( $this->mSort ) && $this->mSort === 'rlud_diff_days' && $offset !== '' ) {
+			$op = ($order === self::QUERY_ASCENDING) ? '>=' : '<=';
+			// Remove any condition on rlud_diff_days from WHERE
+			if ( is_array( $conds ) ) {
+				foreach ( $conds as $k => $v ) {
+					if ( is_string( $v ) && strpos( $v, 'rlud_diff_days' ) !== false ) {
+						unset( $conds[$k] );
+					}
+				}
+			}
+			if ( !isset( $options['HAVING'] ) ) {
+				$options['HAVING'] = [];
+			}
+			$options['HAVING'][] = 'rlud_diff_days ' . $op . ' ' . intval( $offset );
+		}
+
+		return [ $tables, $fields, $conds, $fname, $options, $join_conds ];
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function getIndexField() {
+			// Return the field names as they appear in the result set, not SQL expressions
+			if ( isset( $this->mSort ) ) {
+				if ( $this->mSort === 'rlud_diff_days' ) {
+					return [ 'rlud_diff_days' ];
+				}
+				if ( $this->mSort === 'rlud_timestamp' ) {
+					return [ 'rlud_timestamp' ];
+				}
+				if ( $this->mSort === 'rev_timestamp' ) {
+					return [ 'rev_timestamp' ];
+				}
+				if ( $this->mSort === 'rlucw_source_timestamp' ) {
+					return [ 'rlucw_source_timestamp' ];
+				}
+				// Fallback to the column name
+				return [ $this->mSort ];
+			}
+			// Default sort
+			return [ 'rlud_timestamp' ];
 	}
 }

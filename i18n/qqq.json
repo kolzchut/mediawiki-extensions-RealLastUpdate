@@ -22,5 +22,8 @@
 	"reallastupdate-apierror-is-redirect": "Error message shown when API request is made for a redirect page. Parameter: $1 - page title",
 	"reallastupdate-source-timestamp": "Column header for source wiki last human edit timestamp",
 	"reallastupdate-no-source-data": "Text shown when no source wiki information is available",
-	"reallastupdate-source-update": "Text for source wiki update information. Parameters: $1 - source wiki code, $2 - source title, $3 - formatted timestamp"
+	"reallastupdate-source-update": "Text for source wiki update information. Parameters: $1 - source wiki code, $2 - source title, $3 - formatted timestamp",
+	"reallastupdate-diff-days": "Column header for the difference in days between the real last update and the source's real last update.",
+	"reallastupdate-no-diff-days": "Text shown when there is no difference in days (or data is missing).",
+	"reallastupdate-diff-days-value": "Message showing the number of days difference. Parameter: $1 - number of days."
 }

@@ -24,5 +24,8 @@
 	"reallastupdate-show-all-dates": "הצג את כל התאריכים",
 	"reallastupdate-source-timestamp": "עריכה אנושית אחרונה במקור",
 	"reallastupdate-no-source-data": "אין מידע על מקור",
-	"reallastupdate-source-update": "עדכון מ-$1:$2 בתאריך $3"
+	"reallastupdate-source-update": "עדכון מ-$1:$2 בתאריך $3",
+	"reallastupdate-diff-days": "הפרש בימים",
+	"reallastupdate-no-diff-days": "אין הפרש",
+	"reallastupdate-diff-days-value": "$1"
 }

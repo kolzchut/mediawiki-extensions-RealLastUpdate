@@ -24,5 +24,8 @@
 	"reallastupdate-show-all-dates": "Show all dates",
 	"reallastupdate-source-timestamp": "Source wiki last human edit",
 	"reallastupdate-no-source-data": "No source wiki information",
-	"reallastupdate-source-update": "Update from $1:$2 on $3"
+	"reallastupdate-source-update": "Update from $1:$2 on $3",
+	"reallastupdate-diff-days": "Difference in days",
+	"reallastupdate-no-diff-days": "No difference",
+	"reallastupdate-diff-days-value": "$1"
 }
