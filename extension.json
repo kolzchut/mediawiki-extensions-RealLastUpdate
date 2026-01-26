@@ -78,10 +78,8 @@
 	"ExtensionMessagesFiles": {
 		"RealLastUpdateAlias": "i18n/RealLastUpdate.alias.php"
 	},
-	"APIModules": {
-		"reallastupdate": {
-			"class": "MediaWiki\\Extension\\RealLastUpdate\\Api\\ApiRealLastUpdate"
-		}
+	"APIPropModules": {
+		"reallastupdate": "MediaWiki\\Extension\\RealLastUpdate\\Api\\ApiRealLastUpdate"
 	},
 	"manifest_version": 2
 }
