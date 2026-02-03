@@ -23,8 +23,6 @@ use Exception;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Revision\RevisionRecord;
 use MediaWiki\User\UserIdentity;
-use Wikimedia\Rdbms\IDatabase;
-use WikiPage;
 
 class RealLastUpdate {
 	private const TABLE_NAME = 'real_last_update';
@@ -46,11 +44,12 @@ class RealLastUpdate {
 	 * Get database connection
 	 *
 	 * @param int $db DB_PRIMARY/DB_REPLICA
-	 * @return IDatabase
+	 * @return \Wikimedia\Rdbms\IReadableDatabase
 	 */
-	public static function getDB( int $db = DB_REPLICA ): IDatabase {
-		$loadBalancer = MediaWikiServices::getInstance()->getDBLoadBalancer();
-		return $loadBalancer->getConnection( $db );
+	public static function getDB( int $db = DB_REPLICA ): \Wikimedia\Rdbms\IReadableDatabase
+	{
+		$connectionProvider = MediaWikiServices::getInstance()->getConnectionProvider();
+		return $db == DB_PRIMARY ? $connectionProvider->getPrimaryDatabase() : $connectionProvider->getReplicaDatabase();
 	}
 
 	/**
@@ -138,7 +137,8 @@ class RealLastUpdate {
 			$actorsToIgnore = self::getIgnoredActorIds();
 
 			// Skip redirect pages
-			$wikiPage = WikiPage::newFromID( $pageId );
+			$mediaWikiServices = MediaWikiServices::getInstance();
+			$wikiPage = $mediaWikiServices->getWikiPageFactory()->newFromID( $pageId );
 			if ( !$wikiPage ) {
 				wfLogWarning( "RealLastUpdate: Failed to load WikiPage for ID: $pageId" );
 				return false;
@@ -150,7 +150,7 @@ class RealLastUpdate {
 
 			// Query for the most recent revision where the actor is not in our ignored list
 			try {
-				$revisionStore = MediaWikiServices::getInstance()->getRevisionStore();
+				$revisionStore = $mediaWikiServices->getRevisionStore();
 				$queryInfo = $revisionStore->getQueryInfo();
 				$conds = [
 					'rev_page' => $pageId

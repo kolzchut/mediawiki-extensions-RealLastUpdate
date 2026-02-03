@@ -47,7 +47,7 @@ class Hooks implements
 	 */
 	public function onOutputPageParserOutput( $out, $parserOutput ): void {
 		// If we already have the properties, no need to do anything
-		if ( $parserOutput->getProperty( self::PROP_TIME ) && $parserOutput->getProperty( self::PROP_REV ) ) {
+		if ( $parserOutput->getPageProperty( self::PROP_TIME ) && $parserOutput->getPageProperty( self::PROP_REV ) ) {
 			return;
 		}
 
@@ -56,15 +56,8 @@ class Hooks implements
 		if ( $pageId > 0 && !$out->getTitle()->isRedirect() ) {
 			$lastRealEdit = RealLastUpdate::getLastRealEdit( $pageId );
 			if ( $lastRealEdit ) {
-				if ( method_exists( $parserOutput, 'setPageProperty' ) ) {
-					// MW 1.38
-					$parserOutput->setPageProperty( self::PROP_TIME, $lastRealEdit['timestamp'] );
-					$parserOutput->setPageProperty( self::PROP_REV, $lastRealEdit['rev_id'] );
-				} else {
-					$out->setProperty( self::PROP_TIME, $lastRealEdit['timestamp'] );
-					$parserOutput->setProperty( self::PROP_TIME, $lastRealEdit['timestamp'] );
-					$parserOutput->setProperty( self::PROP_REV, $lastRealEdit['rev_id'] );
-				}
+				$parserOutput->setPageProperty( self::PROP_TIME, $lastRealEdit['timestamp'] );
+				$parserOutput->setPageProperty( self::PROP_REV, (string)$lastRealEdit['rev_id'] );
 			}
 		}
 	}
@@ -104,15 +97,8 @@ class Hooks implements
 		}
 
 		// Set the page properties - this happens during parsing so it will be saved to page_props
-		if ( method_exists( $parserOutput, 'setPageProperty' ) ) {
-			// MW 1.38+
-			$parserOutput->setPageProperty( self::PROP_TIME, $lastRealEdit['timestamp'] );
-			$parserOutput->setPageProperty( self::PROP_REV, $lastRealEdit['rev_id'] );
-		} else {
-			// Older MW versions
-			$parserOutput->setProperty( self::PROP_TIME, $lastRealEdit['timestamp'] );
-			$parserOutput->setProperty( self::PROP_REV, $lastRealEdit['rev_id'] );
-		}
+		$parserOutput->setPageProperty( self::PROP_TIME, $lastRealEdit['timestamp'] );
+		$parserOutput->setPageProperty( self::PROP_REV, (string)$lastRealEdit['rev_id'] );
 	}
 
 	/**

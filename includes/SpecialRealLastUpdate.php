@@ -39,9 +39,9 @@ class SpecialRealLastUpdate extends SpecialPage {
 	}
 
 	/**
-	 * @param string|null $par
+	 * @param string|null $subPage
 	 */
-	public function execute( $par ) {
+	public function execute( $subPage ) {
 		$this->setHeaders();
 		$this->outputHeader();
 		$out = $this->getOutput();

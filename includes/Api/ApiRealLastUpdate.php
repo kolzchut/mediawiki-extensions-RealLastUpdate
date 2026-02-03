@@ -8,25 +8,37 @@ namespace MediaWiki\Extension\RealLastUpdate\Api;
 use ApiQuery;
 use ApiQueryBase;
 use MediaWiki\Extension\RealLastUpdate\RealLastUpdate;
+use MediaWiki\Page\RedirectLookup;
+use MediaWiki\Page\WikiPageFactory;
 use Wikimedia\ParamValidator\ParamValidator;
 
 /**
  * API module to get real last update information
  */
 class ApiRealLastUpdate extends ApiQueryBase {
+	/** @var RedirectLookup */
+	private $redirectLookup;
+
+	/** @var WikiPageFactory */
+	private $wikiPageFactory;
+
 	/**
 	 * Constructor
 	 *
 	 * @param ApiQuery $mainModule
 	 * @param string $moduleName
-	 * @param string $modulePrefix
+	 * @param RedirectLookup $redirectLookup
+	 * @param WikiPageFactory $wikiPageFactory
 	 */
 	public function __construct(
 		ApiQuery $mainModule,
 		$moduleName,
-		$modulePrefix = ''
+		RedirectLookup $redirectLookup,
+		WikiPageFactory $wikiPageFactory
 	) {
-		parent::__construct( $mainModule, $moduleName, $modulePrefix );
+		parent::__construct( $mainModule, $moduleName, 'rlu' );
+		$this->redirectLookup = $redirectLookup;
+		$this->wikiPageFactory = $wikiPageFactory;
 	}
 
 	/**
@@ -60,9 +72,19 @@ class ApiRealLastUpdate extends ApiQueryBase {
 				$this->addDebugInfo( "Following redirect for: " . $title->getPrefixedText() );
 				$result->addValue( $path, 'redirect', true );
 
-				// First redirect
-				$targetTitle = $title->getRedirectTarget();
+				// First redirect - get redirect target using RedirectLookup
+				$wikiPage = $this->wikiPageFactory->newFromTitle( $title );
+				$targetLinkTarget = $this->redirectLookup->getRedirectTarget( $wikiPage );
 
+				if ( !$targetLinkTarget ) {
+					$result->addValue( $path, 'redirecttarget', [
+						'missing' => true
+					] );
+					continue;
+				}
+
+				// Convert LinkTarget to Title
+				$targetTitle = \Title::newFromLinkTarget( $targetLinkTarget );
 				if ( !$targetTitle || !$targetTitle->exists() ) {
 					$result->addValue( $path, 'redirecttarget', [
 						'missing' => true
@@ -77,8 +99,24 @@ class ApiRealLastUpdate extends ApiQueryBase {
 				if ( $targetIsRedirect && $followRedirects ) {
 					$this->addDebugInfo( "Following second-level redirect from: " . $targetTitle->getPrefixedText() );
 
-					$finalTitle = $targetTitle->getRedirectTarget();
+					// Get second level redirect target
+					$targetWikiPage = $this->wikiPageFactory->newFromTitle( $targetTitle );
+					$finalLinkTarget = $this->redirectLookup->getRedirectTarget( $targetWikiPage );
 
+					if ( !$finalLinkTarget ) {
+						$result->addValue( $path, 'redirecttarget', [
+							'pageid' => $targetPageId,
+							'title' => $targetTitle->getPrefixedText(),
+							'redirect' => true,
+							'finaltarget' => [
+								'missing' => true
+							]
+						] );
+						continue;
+					}
+
+					// Convert LinkTarget to Title
+					$finalTitle = \Title::newFromLinkTarget( $finalLinkTarget );
 					if ( !$finalTitle || !$finalTitle->exists() ) {
 						$result->addValue( $path, 'redirecttarget', [
 							'pageid' => $targetPageId,
