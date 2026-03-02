@@ -63,7 +63,7 @@ class RealLastUpdate {
 	public static function updateLastRealEdit( int $pageId, int $revId, string $timestamp ): bool {
 		$dbw = self::getDB( DB_PRIMARY );
 
-		return $dbw->upsert(
+		$dbw->upsert(
 			self::TABLE_NAME,
 			[
 				'rlud_page_id' => $pageId,
@@ -77,6 +77,8 @@ class RealLastUpdate {
 			],
 			__METHOD__
 		);
+
+		return true;
 	}
 
 	/**
