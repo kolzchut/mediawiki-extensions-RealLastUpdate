@@ -377,7 +377,7 @@ class RealLastUpdate {
 	 */
 	public static function isSourceWiki(): bool {
 		$sourceWiki = self::getConfigVar( 'RealLastUpdateSourceWiki' );
-		$currentWikiId = self::getConfigVar( 'Wiki' );
+		$currentWikiId = $GLOBALS['wgWiki'] ?? null;
 
 		// This is a source wiki if:
 		// - RealLastUpdateSourceWiki is false (this is the only/main wiki), or
