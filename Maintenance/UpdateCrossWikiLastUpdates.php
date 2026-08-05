@@ -98,9 +98,22 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 			return;
 		}
 
-		// Exit if this is the source wiki
-		$currentWiki = RealLastUpdate::getConfigVar( 'Wiki' );
-		if ( $currentWiki === $sourceWiki ) {
+		// Exit if this is the source wiki.
+		//
+		// Use isSourceWiki(), which reads $GLOBALS['wgWiki'] directly, rather than
+		// resolving 'Wiki' through getConfigVar(). $wgWiki is a wiki-farm global
+		// this extension neither owns nor declares in its config block, so the
+		// registry's GlobalVarConfig::get() throws ConfigException the moment a
+		// wiki does not happen to define it — turning a wiki-farm detail into a
+		// hard failure of the whole script. That is not hypothetical: it killed
+		// every nightly run on the Kol-Zchut container stack for weeks, silently,
+		// because the global went away in a settings rewrite.
+		//
+		// Reading the global directly degrades instead: an undefined $wgWiki
+		// simply means "this is not the source wiki", which is the safe answer
+		// for a cross-wiki updater. It also keeps every read of that legacy
+		// global in one place, so it can be retired in one edit.
+		if ( RealLastUpdate::isSourceWiki() ) {
 			$this->output( "This is the source wiki ($sourceWiki). No cross-wiki updates needed.\n" );
 			return;
 		}
