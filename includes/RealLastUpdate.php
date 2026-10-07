@@ -20,6 +20,7 @@
 namespace MediaWiki\Extension\RealLastUpdate;
 
 use Exception;
+use MediaWiki\MainConfigNames;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Revision\RevisionRecord;
 use MediaWiki\User\UserIdentity;
@@ -373,11 +374,27 @@ class RealLastUpdate {
 	/**
 	 * Check if the current wiki is the source wiki
 	 *
+	 * A wiki is identified by its content language code, the same value
+	 * $wgRealLastUpdateSourceWiki holds and the same string the source wiki's
+	 * interwiki prefix uses. This assumes one wiki per language, which is how
+	 * this extension is deployed, the source being one of them.
+	 *
+	 * The language code is read from core's own config, which always defines
+	 * it. This used to read a legacy wiki-farm global that neither core nor
+	 * this extension declares, so whether it was set depended on site settings,
+	 * and when it was not, every wiki quietly counted as "not the source".
+	 *
+	 * The database identity ($wgRealLastUpdateSourceWikiDb against the current
+	 * wiki ID) is deliberately not used: a site may blank that setting on the
+	 * source wiki itself (Kol-Zchut does under update.php and the test
+	 * runners), which would flip the answer for exactly the wiki that matters.
+	 *
 	 * @return bool True if this wiki is the source wiki, false otherwise
 	 */
 	public static function isSourceWiki(): bool {
 		$sourceWiki = self::getConfigVar( 'RealLastUpdateSourceWiki' );
-		$currentWikiId = $GLOBALS['wgWiki'] ?? null;
+		$currentWikiId = MediaWikiServices::getInstance()->getMainConfig()
+			->get( MainConfigNames::LanguageCode );
 
 		// This is a source wiki if:
 		// - RealLastUpdateSourceWiki is false (this is the only/main wiki), or

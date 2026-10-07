@@ -25,7 +25,7 @@
 		},
 		"RealLastUpdateSourceWiki": {
 			"value": null,
-			"description": "Source wiki name"
+			"description": "Language code of the source wiki; also its interwiki prefix. A wiki is the source when its $wgLanguageCode equals this. false means this is the only wiki"
 		},
 		"RealLastUpdateSourceWikiApi": {
 			"value": "https://he.example.org/w/api.php",
