@@ -42,7 +42,7 @@ there.
 ## Configuration
 
 - `$wgRealLastUpdateBotGroups`: Array of user groups considered bots (default: `[ 'bot', 'automaton' ]`).
-- `$wgRealLastUpdateSourceWiki`: (Optional) Name of the source wiki for cross-wiki support.
+- `$wgRealLastUpdateSourceWiki`: (Optional) Language code of the source wiki for cross-wiki support. A wiki whose `$wgLanguageCode` equals it is the source wiki; the others pull their data from it. It is also the interwiki prefix used to link to the source wiki.
 - `$wgRealLastUpdateSourceWikiApi`: (Optional) API URL for the source wiki (used for API-based cross-wiki support).
 - `$wgRealLastUpdateSourceWikiDb`: (Optional) Database identifier for direct access to the source wiki database (used for DB-based cross-wiki support).
 
@@ -99,7 +99,7 @@ When using this extension across multiple wikis, it can track and display last u
 
 To enable cross-wiki support:
 
-1. Set `$wgRealLastUpdateSourceWiki` to the source wiki's name.
+1. Set `$wgRealLastUpdateSourceWiki` to the source wiki's language code.
 2. Set either `$wgRealLastUpdateSourceWikiDb` (for DB access) or `$wgRealLastUpdateSourceWikiApi` (for API access) as appropriate.
 3. Ensure an interwiki prefix is set up for the source wiki that matches the name in `$wgRealLastUpdateSourceWiki`.
 4. **Schedule the cross-wiki maintenance script** to run periodically (e.g., via cron) to keep the local data in sync:
