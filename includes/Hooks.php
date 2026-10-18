@@ -179,7 +179,10 @@ class Hooks implements
 				$dbw->delete( 'real_last_update_cross_wiki', [ 'rlucw_page_id' => $pageId ], __METHOD__ );
 			}
 		} catch ( \Exception $e ) {
-			\wfLogWarning( 'RealLastUpdate: Failed to clean up after article deletion for page ID ' . $pageId . ': ' . $e->getMessage() );
+			\wfLogWarning(
+				'RealLastUpdate: Failed to clean up after article deletion for page ID ' .
+				$pageId . ': ' . $e->getMessage()
+			);
 		}
 		return true;
 	}

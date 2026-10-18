@@ -211,7 +211,9 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 					'local_page_title' => $pageTitles[$pageId],
 					'source_title' => $sourceTitle,
 					'source_page_id' => $reportData[$sourceTitle]['page_id'] ?? 'unknown',
-					'is_redirect' => isset( $reportData[$sourceTitle]['is_redirect'] ) && $reportData[$sourceTitle]['is_redirect'] ? 'yes' : 'no',
+					'is_redirect' => isset( $reportData[$sourceTitle]['is_redirect'] )
+						&& $reportData[$sourceTitle]['is_redirect']
+						? 'yes' : 'no',
 					'redirect_target' => $reportData[$sourceTitle]['redirect_target'] ?? '',
 					'redirect_target_page_id' => $reportData[$sourceTitle]['redirect_target_page_id'] ?? '',
 					'has_rlu_data' => 'no',
@@ -296,7 +298,9 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 
 		$this->output( "Done! Processed $count pages, updated $updatedCount cross-wiki relationships.\n" );
 		if ( $missingCount > 0 ) {
-			$this->output( "Warning: $missingCount pages were skipped because no data was found in the source wiki.\n" );
+			$this->output(
+				"Warning: $missingCount pages were skipped because no data was found in the source wiki.\n"
+			);
 
 			// Write missing pages to CSV if requested
 			if ( $csvHandle ) {
@@ -310,7 +314,9 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 				fclose( $csvHandle );
 				$this->output( "Details of missing cross-wiki updates written to $csvFile\n" );
 			}
-			$this->output( "Redirect statistics: Found $totalRedirects redirects, $redirectsWithRLU of which had RLU data.\n" );
+			$this->output(
+				"Redirect statistics: Found $totalRedirects redirects, $redirectsWithRLU of which had RLU data.\n"
+			);
 		}
 
 		// Close report file if opened
@@ -409,7 +415,8 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 
 		// Group titles by namespace to reduce number of queries
 		$namespacedTitles = [];
-		$titleMapping = []; // Maps normalized lookup key back to original title
+		// Maps normalized lookup key back to original title
+		$titleMapping = [];
 
 		foreach ( $titles as $title ) {
 			$normalized = $this->normalizeForDB( $title );
@@ -444,7 +451,8 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 		$redirectTargets = [];
 		$redirectSources = [];
 		$redirectTargetPages = [];
-		$redirectChains = []; // Track redirect chains by source ID
+		// Track redirect chains by source ID
+		$redirectChains = [];
 
 		foreach ( $namespacedTitles as $ns => $dbTitles ) {
 			$redirectRes = $sourceDb->select(
@@ -463,7 +471,9 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 			foreach ( $redirectRes as $row ) {
 				$lookupKey = "{$ns}:{$row->page_title}";
 				$originalTitle = $titleMapping[$lookupKey] ?? null;
-				if ( !$originalTitle ) continue;
+				if ( !$originalTitle ) {
+					continue;
+				}
 
 				$redirectSourceId = (int)$row->page_id;
 				$redirectTargetNs = (int)$row->rd_namespace;
@@ -553,7 +563,9 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 					$sourceTitle = $redirectSources[$lookupKey];
 
 					if ( $debug ) {
-						$this->output( "  Mapping redirect target '{$displayTitle}' (ID: $pageId) to source '{$sourceTitle}'\n" );
+						$this->output(
+							"  Mapping redirect target '{$displayTitle}' (ID: $pageId) to source '{$sourceTitle}'\n"
+						);
 					}
 
 					// Find the source ID for this redirect
@@ -657,7 +669,10 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 					$result[$titleToUpdate] = $rluData;
 
 					// Check if this page was a redirect target and count it
-					if ( isset( $redirectTargetPages[$titleToUpdate] ) && $redirectTargetPages[$titleToUpdate] === $rluPageId ) {
+					if (
+						isset( $redirectTargetPages[$titleToUpdate] ) &&
+						$redirectTargetPages[$titleToUpdate] === $rluPageId
+					) {
 						$redirectsWithRLU++;
 					}
 
@@ -679,7 +694,10 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 							$result[$titleToUpdate] = $rluData;
 
 							if ( $debug ) {
-								$this->output( "  Assigning RLU data from redirect source ID $rluPageId to '$titleToUpdate' (target ID: $targetPageId)\n" );
+								$this->output(
+									"  Assigning RLU data from redirect source ID $rluPageId to '$titleToUpdate' " .
+									"(target ID: $targetPageId)\n"
+								);
 							}
 						}
 					}
@@ -693,7 +711,9 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 						$redirectsWithRLU++;
 
 						if ( $debug ) {
-							$this->output( "  Assigning RLU data to redirect source '$sourceTitle' (ID: $rluPageId)\n" );
+							$this->output(
+								"  Assigning RLU data to redirect source '$sourceTitle' (ID: $rluPageId)\n"
+							);
 						}
 					}
 				}
@@ -711,7 +731,11 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 							$redirectsWithRLU++;
 
 							if ( $debug ) {
-								$this->output( "  Assigning RLU data from target ID $rluPageId to redirect source '$sourceTitle' (ID: $sourceId)\n" );
+								$this->output(
+									"  Assigning RLU data from target ID $rluPageId " .
+									"to redirect source '$sourceTitle' " .
+									"(ID: $sourceId)\n"
+								);
 							}
 						}
 					}
@@ -725,7 +749,7 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 			foreach ( $result as $title => $data ) {
 				$pageId = $pageIds[$title] ?? 'unknown';
 				$isRedirect = isset( $redirectTargets[$title] ) ? 'Yes' : 'No';
-				$targetId = isset( $redirectTargets[$title] ) ? ($redirectTargetPages[$title] ?? 'unknown') : 'N/A';
+				$targetId = isset( $redirectTargets[$title] ) ? ( $redirectTargetPages[$title] ?? 'unknown' ) : 'N/A';
 
 				$this->output( "    Title: $title (ID: $pageId, Redirect: $isRedirect, Target ID: $targetId)\n" );
 				$this->output( "      RLU data: rev={$data['rev_id']}, ts={$data['timestamp']}\n" );
@@ -790,8 +814,10 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 			$encodedTitles = [];
 			foreach ( $chunk as $title ) {
 				$normalized = $this->normalizeForAPI( $title );
-				$apiTitle = $normalized['prefixed']; // Get the properly formatted prefixed title
-				$titleMapping[$apiTitle] = $title; // Map API title back to original
+				// Get the properly formatted prefixed title
+				$apiTitle = $normalized['prefixed'];
+				// Map API title back to original
+				$titleMapping[$apiTitle] = $title;
 				$encodedTitles[] = rawurlencode( $apiTitle );
 
 				if ( $debug && $apiTitle !== $title ) {
@@ -834,8 +860,10 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 			// Build redirect map if redirects occurred
 			$redirectMap = [];
 			$redirectTargetPages = [];
-			$redirectSourceIds = []; // Track redirect source IDs
-			$redirectTargetIds = []; // Track redirect target IDs
+			// Track redirect source IDs
+			$redirectSourceIds = [];
+			// Track redirect target IDs
+			$redirectTargetIds = [];
 
 			if ( isset( $data['query']['redirects'] ) ) {
 				// Count the redirects in this batch
@@ -875,7 +903,7 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 						$this->output( "  Normalized: '$from' → '$to'\n" );
 					}
 				}
-				}
+			}
 
 			// Create a mapping from page IDs to all titles that should receive that page's RLU data
 			$pageIdToTitles = [];
@@ -884,7 +912,10 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 
 			// First pass: identify redirect relationships by page ID
 			foreach ( $data['query']['pages'] as $pageId => $pageData ) {
-				if ( $pageId < 0 ) continue; // Skip missing pages
+				if ( $pageId < 0 ) {
+					// Skip missing pages
+					continue;
+				}
 
 				$pageId = (int)$pageId;
 				$title = $pageData['title'];
@@ -898,7 +929,9 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 								$redirectSourceToTargetId[(int)$sourceId] = $pageId;
 
 								if ( $debug ) {
-									$this->output( "  Mapped redirect source ID $sourceId ($from) to target ID $pageId ($to)\n" );
+									$this->output(
+										"  Mapped redirect source ID $sourceId ($from) to target ID $pageId ($to)\n"
+									);
 								}
 								break;
 							}
@@ -956,7 +989,11 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 						}
 
 						if ( $debug ) {
-							$this->output( "  Normalized mapping: '$preNormalizedTitle' → '$title' to original '$originalTitle', page ID $pageId\n" );
+							$this->output(
+								"  Normalized mapping: '$preNormalizedTitle' → '$title' " .
+								"to original '$originalTitle', " .
+								"page ID $pageId\n"
+							);
 						}
 					}
 				}
@@ -976,7 +1013,10 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 							}
 
 							if ( $debug ) {
-								$this->output( "  Redirect target mapping: '$from' → '$title' to original '$originalTitle', page ID $pageId\n" );
+								$this->output(
+									"  Redirect target mapping: '$from' → '$title' " .
+									"to original '$originalTitle', page ID $pageId\n"
+								);
 							}
 						}
 					}
@@ -999,7 +1039,9 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 
 			// Third pass to process RLU data and assign it to all related titles
 			foreach ( $data['query']['pages'] as $pageId => $pageData ) {
-				if ( $pageId < 0 ) continue;
+				if ( $pageId < 0 ) {
+					continue;
+				}
 
 				$pageId = (int)$pageId;
 
@@ -1022,12 +1064,17 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 							$result[$titleToUpdate] = $rluData;
 
 							// Check if this page was a redirect target and count it
-							if ( isset( $redirectTargetPages[$titleToUpdate] ) && $redirectTargetPages[$titleToUpdate] === $pageId ) {
+							if (
+								isset( $redirectTargetPages[$titleToUpdate] ) &&
+								$redirectTargetPages[$titleToUpdate] === $pageId
+							) {
 								$redirectsWithRLU++;
 							}
 
 							if ( $debug ) {
-								$this->output( "  Assigning RLU data to '$titleToUpdate' (ID: $pageId) - direct mapping\n" );
+								$this->output(
+									"  Assigning RLU data to '$titleToUpdate' (ID: $pageId) - direct mapping\n"
+								);
 							}
 						}
 					}
@@ -1044,7 +1091,11 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 									$result[$titleToUpdate] = $rluData;
 
 									if ( $debug ) {
-										$this->output( "  Assigning RLU data from redirect source ID $pageId to '$titleToUpdate' (target ID: $targetPageId)\n" );
+										$this->output(
+											"  Assigning RLU data from redirect source ID $pageId " .
+											"to '$titleToUpdate' " .
+											"(target ID: $targetPageId)\n"
+										);
 									}
 								}
 							}
@@ -1063,7 +1114,11 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 										$redirectsWithRLU++;
 
 										if ( $debug ) {
-											$this->output( "  Assigning RLU data from target ID $pageId to redirect source '$titleToUpdate' (ID: $sourceId)\n" );
+											$this->output(
+												"  Assigning RLU data from target ID $pageId " .
+												"to redirect source '$titleToUpdate' " .
+												"(ID: $sourceId)\n"
+											);
 										}
 									}
 								}

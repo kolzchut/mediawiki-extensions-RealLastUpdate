@@ -25,7 +25,6 @@ namespace MediaWiki\Extension\RealLastUpdate;
 
 use ExtensionRegistry;
 use Html;
-use IndexPager;
 use MalformedTitleException;
 use MediaWiki\Linker\LinkRenderer;
 use MediaWiki\MediaWikiServices;
@@ -77,8 +76,8 @@ class RealLastUpdatePager extends TablePager {
 	public function __construct(
 		$specialPage,
 		$filterOptions,
-		UserOptionsLookup $userOptionsLookup = null,
-		TitleParser $titleParser = null
+		?UserOptionsLookup $userOptionsLookup = null,
+		?TitleParser $titleParser = null
 	) {
 		parent::__construct( $specialPage->getContext() );
 
@@ -166,7 +165,10 @@ class RealLastUpdatePager extends TablePager {
 				$queryInfo['fields']['rlucw_source_title'] = 'real_last_update_cross_wiki.rlucw_source_title';
 			}
 			 // Use a simple key for the computed field
-			$queryInfo['fields']['rlud_diff_days'] = "IF(real_last_update.rlud_timestamp IS NOT NULL AND real_last_update_cross_wiki.rlucw_source_timestamp IS NOT NULL, DATEDIFF(STR_TO_DATE(real_last_update_cross_wiki.rlucw_source_timestamp, '%Y%m%d%H%i%S'), STR_TO_DATE(real_last_update.rlud_timestamp, '%Y%m%d%H%i%S')), NULL)";
+			$queryInfo['fields']['rlud_diff_days'] = "IF(real_last_update.rlud_timestamp IS NOT NULL" .
+				" AND real_last_update_cross_wiki.rlucw_source_timestamp IS NOT NULL," .
+				" DATEDIFF(STR_TO_DATE(real_last_update_cross_wiki.rlucw_source_timestamp, '%Y%m%d%H%i%S')," .
+				" STR_TO_DATE(real_last_update.rlud_timestamp, '%Y%m%d%H%i%S')), NULL)";
 			$queryInfo['options']['GROUP BY'][] = 'real_last_update_cross_wiki.rlucw_source_timestamp';
 			$queryInfo['options']['GROUP BY'][] = 'real_last_update_cross_wiki.rlucw_source_title';
 		}
@@ -367,13 +369,18 @@ class RealLastUpdatePager extends TablePager {
 
 	/**
 	 * Override buildQueryInfo to inject HAVING for computed fields when paging and remove from WHERE
+	 *
+	 * @param string $offset Index offset, inclusive
+	 * @param int $limit Exact query limit
+	 * @param bool $order IndexPager::QUERY_ASCENDING or IndexPager::QUERY_DESCENDING
+	 * @return array [ $tables, $fields, $conds, $fname, $options, $join_conds ]
 	 */
 	protected function buildQueryInfo( $offset, $limit, $order ) {
-		list( $tables, $fields, $conds, $fname, $options, $join_conds ) = parent::buildQueryInfo( $offset, $limit, $order );
+		[ $tables, $fields, $conds, $fname, $options, $join_conds ] = parent::buildQueryInfo( $offset, $limit, $order );
 
 		// Only add HAVING for rlud_diff_days if needed
 		if ( isset( $this->mSort ) && $this->mSort === 'rlud_diff_days' && $offset !== '' ) {
-			$op = ($order === self::QUERY_ASCENDING) ? '>=' : '<=';
+			$op = ( $order === self::QUERY_ASCENDING ) ? '>=' : '<=';
 			// Remove any condition on rlud_diff_days from WHERE
 			if ( is_array( $conds ) ) {
 				foreach ( $conds as $k => $v ) {
@@ -395,24 +402,24 @@ class RealLastUpdatePager extends TablePager {
 	 * @inheritDoc
 	 */
 	public function getIndexField() {
-			// Return the field names as they appear in the result set, not SQL expressions
-			if ( isset( $this->mSort ) ) {
-				if ( $this->mSort === 'rlud_diff_days' ) {
-					return [ 'rlud_diff_days' ];
-				}
-				if ( $this->mSort === 'rlud_timestamp' ) {
-					return [ 'rlud_timestamp' ];
-				}
-				if ( $this->mSort === 'rev_timestamp' ) {
-					return [ 'rev_timestamp' ];
-				}
-				if ( $this->mSort === 'rlucw_source_timestamp' ) {
-					return [ 'rlucw_source_timestamp' ];
-				}
-				// Fallback to the column name
-				return [ $this->mSort ];
+		// Return the field names as they appear in the result set, not SQL expressions
+		if ( isset( $this->mSort ) ) {
+			if ( $this->mSort === 'rlud_diff_days' ) {
+				return [ 'rlud_diff_days' ];
 			}
-			// Default sort
-			return [ 'rlud_timestamp' ];
+			if ( $this->mSort === 'rlud_timestamp' ) {
+				return [ 'rlud_timestamp' ];
+			}
+			if ( $this->mSort === 'rev_timestamp' ) {
+				return [ 'rev_timestamp' ];
+			}
+			if ( $this->mSort === 'rlucw_source_timestamp' ) {
+				return [ 'rlucw_source_timestamp' ];
+			}
+			// Fallback to the column name
+			return [ $this->mSort ];
+		}
+		// Default sort
+		return [ 'rlud_timestamp' ];
 	}
 }
