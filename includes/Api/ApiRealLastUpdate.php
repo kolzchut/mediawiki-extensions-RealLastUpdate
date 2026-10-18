@@ -145,7 +145,9 @@ class ApiRealLastUpdate extends ApiQueryBase {
 					// Get data for final target
 					$lastUpdate = RealLastUpdate::getLastRealEdit( $finalPageId );
 					if ( $lastUpdate ) {
-						$this->addDebugInfo( "Found final target update data: rev={$lastUpdate['rev_id']}, ts={$lastUpdate['timestamp']}" );
+						$this->addDebugInfo(
+							"Found final target update data: rev={$lastUpdate['rev_id']}, ts={$lastUpdate['timestamp']}"
+						);
 						$result->addValue( $path, 'reallastupdate', [
 							'revision' => $lastUpdate['rev_id'],
 							'timestamp' => $lastUpdate['timestamp']
@@ -165,7 +167,9 @@ class ApiRealLastUpdate extends ApiQueryBase {
 					// Get data for target
 					$lastUpdate = RealLastUpdate::getLastRealEdit( $targetPageId );
 					if ( $lastUpdate ) {
-						$this->addDebugInfo( "Found target update data: rev={$lastUpdate['rev_id']}, ts={$lastUpdate['timestamp']}" );
+						$this->addDebugInfo(
+							"Found target update data: rev={$lastUpdate['rev_id']}, ts={$lastUpdate['timestamp']}"
+						);
 						$result->addValue( $path, 'reallastupdate', [
 							'revision' => $lastUpdate['rev_id'],
 							'timestamp' => $lastUpdate['timestamp']
@@ -184,7 +188,9 @@ class ApiRealLastUpdate extends ApiQueryBase {
 
 				$lastUpdate = RealLastUpdate::getLastRealEdit( $pageId );
 				if ( $lastUpdate ) {
-					$this->addDebugInfo( "Found update data: rev={$lastUpdate['rev_id']}, ts={$lastUpdate['timestamp']}" );
+					$this->addDebugInfo(
+						"Found update data: rev={$lastUpdate['rev_id']}, ts={$lastUpdate['timestamp']}"
+					);
 					$result->addValue( $path, 'reallastupdate', [
 						'revision' => $lastUpdate['rev_id'],
 						'timestamp' => $lastUpdate['timestamp']
@@ -240,7 +246,8 @@ class ApiRealLastUpdate extends ApiQueryBase {
 			'action=query&prop=reallastupdate&titles=Main_Page' => 'apihelp-query+reallastupdate-example-1',
 			'action=query&prop=reallastupdate&titles=Main_Page|Help|About' => 'apihelp-query+reallastupdate-example-2',
 			'action=query&generator=allpages&prop=reallastupdate' => 'apihelp-query+reallastupdate-example-3',
-			'action=query&prop=reallastupdate&titles=SomeRedirect&followredirects=1' => 'apihelp-query+reallastupdate-example-4',
+			'action=query&prop=reallastupdate&titles=SomeRedirect&followredirects=1'
+				=> 'apihelp-query+reallastupdate-example-4',
 		];
 	}
 }

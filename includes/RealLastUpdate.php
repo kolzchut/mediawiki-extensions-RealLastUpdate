@@ -47,10 +47,11 @@ class RealLastUpdate {
 	 * @param int $db DB_PRIMARY/DB_REPLICA
 	 * @return \Wikimedia\Rdbms\IReadableDatabase
 	 */
-	public static function getDB( int $db = DB_REPLICA ): \Wikimedia\Rdbms\IReadableDatabase
-	{
+	public static function getDB( int $db = DB_REPLICA ): \Wikimedia\Rdbms\IReadableDatabase {
 		$connectionProvider = MediaWikiServices::getInstance()->getConnectionProvider();
-		return $db == DB_PRIMARY ? $connectionProvider->getPrimaryDatabase() : $connectionProvider->getReplicaDatabase();
+		return $db == DB_PRIMARY
+			? $connectionProvider->getPrimaryDatabase()
+			: $connectionProvider->getReplicaDatabase();
 	}
 
 	/**
