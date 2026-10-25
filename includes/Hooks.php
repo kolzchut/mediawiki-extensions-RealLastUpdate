@@ -23,7 +23,6 @@ use MediaWiki\Installer\Hook\LoadExtensionSchemaUpdatesHook;
 use MediaWiki\Page\Hook\ArticleDeleteCompleteHook;
 use MediaWiki\Preferences\Hook\GetPreferencesHook;
 use MediaWiki\Storage\Hook\PageSaveCompleteHook;
-use Parser;
 use User;
 
 /**
@@ -60,45 +59,6 @@ class Hooks implements
 				$parserOutput->setPageProperty( self::PROP_REV, (string)$lastRealEdit['rev_id'] );
 			}
 		}
-	}
-
-	/**
-	 * ParserAfterTidy hook handler
-	 * See https://www.mediawiki.org/wiki/Manual:Hooks/ParserAfterTidy
-	 *
-	 * @param Parser $parser
-	 * @param string &$text
-	 * @return bool|void
-	 */
-	public function onParserAfterTidy( $parser, &$text ) {
-		$parserOutput = $parser->getOutput();
-		$title = $parser->getTitle();
-
-		// If the properties are already set, don't do anything
-		if ( $parserOutput->getProperty( self::PROP_TIME ) && $parserOutput->getProperty( self::PROP_REV ) ) {
-			return;
-		}
-
-		// Get the page ID
-		$pageId = $title->getArticleID();
-		if ( $pageId <= 0 ) {
-			return;
-		}
-
-		// Skip if this is a redirect
-		if ( $title->isRedirect() ) {
-			return;
-		}
-
-		// Get the last real edit information
-		$lastRealEdit = RealLastUpdate::getLastRealEdit( $pageId );
-		if ( !$lastRealEdit ) {
-			return;
-		}
-
-		// Set the page properties - this happens during parsing so it will be saved to page_props
-		$parserOutput->setPageProperty( self::PROP_TIME, $lastRealEdit['timestamp'] );
-		$parserOutput->setPageProperty( self::PROP_REV, (string)$lastRealEdit['rev_id'] );
 	}
 
 	/**
