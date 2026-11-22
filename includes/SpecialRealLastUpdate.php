@@ -43,6 +43,9 @@ class SpecialRealLastUpdate extends SpecialPage {
 	 */
 	public function execute( $subPage ) {
 		$this->setHeaders();
+		// The 'edit' restriction passed to the constructor is only declared
+		// there; it takes effect here, before any form or query is built.
+		$this->checkPermissions();
 		$this->outputHeader();
 		$out = $this->getOutput();
 		$out->addModuleStyles( 'mediawiki.special' );
