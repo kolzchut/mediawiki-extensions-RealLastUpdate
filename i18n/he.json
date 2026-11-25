@@ -29,5 +29,12 @@
 	"reallastupdate-no-diff-days": "אין הפרש",
 	"reallastupdate-diff-days-value": "$1",
 	"reallastupdate-namespace-unreadable": "אין לך הרשאה לקרוא דפים במרחב השם שנבחר, ולכן הם אינם מוצגים.",
-	"apiwarn-reallastupdate-cannotread": "נתוני העדכון האחרון של \"$1\" לא הוחזרו: אין לך הרשאה לקרוא את הדף, או את הדף שאליו הוא מפנה."
+	"apiwarn-reallastupdate-cannotread": "נתוני העדכון האחרון של \"$1\" לא הוחזרו: אין לך הרשאה לקרוא את הדף, או את הדף שאליו הוא מפנה.",
+	"apihelp-query+reallastupdate-summary": "קבלת הגרסה והזמן של העריכה האחרונה של כל דף שנעשתה בידי עורך אנושי, ולא בידי בוט.",
+	"apihelp-query+reallastupdate-param-debug": "הוספת מידע לניפוי שגיאות לתוצאה.",
+	"apihelp-query+reallastupdate-param-followredirects": "עבור דף הפניה, החזרת הנתונים של הדף שאליו הוא מפנה, עד שתי הפניות.",
+	"apihelp-query+reallastupdate-example-1": "קבלת העריכה האנושית האחרונה של <kbd>Main Page</kbd>.",
+	"apihelp-query+reallastupdate-example-2": "קבלת העריכה האנושית האחרונה של כמה דפים.",
+	"apihelp-query+reallastupdate-example-3": "קבלת העריכה האנושית האחרונה של כל הדפים.",
+	"apihelp-query+reallastupdate-example-4": "קבלת העריכה האנושית האחרונה של הדף שאליו <kbd>SomeRedirect</kbd> מפנה."
 }

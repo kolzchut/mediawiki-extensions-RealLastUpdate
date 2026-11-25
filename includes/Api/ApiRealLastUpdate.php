@@ -267,12 +267,10 @@ class ApiRealLastUpdate extends ApiQueryBase {
 			'debug' => [
 				ParamValidator::PARAM_TYPE => 'boolean',
 				ParamValidator::PARAM_DEFAULT => false,
-				\ApiBase::PARAM_HELP_MSG => 'api-help-param-debug',
 			],
 			'followredirects' => [
 				ParamValidator::PARAM_TYPE => 'boolean',
 				ParamValidator::PARAM_DEFAULT => false,
-				\ApiBase::PARAM_HELP_MSG => 'api-help-param-followredirects',
 			],
 		];
 	}
@@ -285,7 +283,7 @@ class ApiRealLastUpdate extends ApiQueryBase {
 			'action=query&prop=reallastupdate&titles=Main_Page' => 'apihelp-query+reallastupdate-example-1',
 			'action=query&prop=reallastupdate&titles=Main_Page|Help|About' => 'apihelp-query+reallastupdate-example-2',
 			'action=query&generator=allpages&prop=reallastupdate' => 'apihelp-query+reallastupdate-example-3',
-			'action=query&prop=reallastupdate&titles=SomeRedirect&followredirects=1'
+			'action=query&prop=reallastupdate&titles=SomeRedirect&rlufollowredirects=1'
 				=> 'apihelp-query+reallastupdate-example-4',
 		];
 	}

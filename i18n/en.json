@@ -29,5 +29,12 @@
 	"reallastupdate-no-diff-days": "No difference",
 	"reallastupdate-diff-days-value": "$1",
 	"reallastupdate-namespace-unreadable": "You cannot read pages in the selected namespace, so they are not listed.",
-	"apiwarn-reallastupdate-cannotread": "Real last update data for \"$1\" was left out: you cannot read that page, or the page it redirects to."
+	"apiwarn-reallastupdate-cannotread": "Real last update data for \"$1\" was left out: you cannot read that page, or the page it redirects to.",
+	"apihelp-query+reallastupdate-summary": "Get the revision and time of each page's last edit by a human editor, as opposed to a bot.",
+	"apihelp-query+reallastupdate-param-debug": "Add debugging information to the result.",
+	"apihelp-query+reallastupdate-param-followredirects": "For a redirect, return the data of the page it points to, following up to two redirects.",
+	"apihelp-query+reallastupdate-example-1": "Get the last human edit of <kbd>Main Page</kbd>.",
+	"apihelp-query+reallastupdate-example-2": "Get the last human edit of several pages.",
+	"apihelp-query+reallastupdate-example-3": "Get the last human edit of every page.",
+	"apihelp-query+reallastupdate-example-4": "Get the last human edit of the page that <kbd>SomeRedirect</kbd> points to."
 }

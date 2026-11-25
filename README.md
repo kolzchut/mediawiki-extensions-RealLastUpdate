@@ -67,9 +67,13 @@ The extension provides a custom API module for querying last human edit informat
   ```
   api.php?action=query&prop=reallastupdate&titles=YourPageTitle
   ```
-- **Parameters:**
-  - `followredirects` (boolean): Follow up to two levels of redirects (default: false)
-  - `debug` (boolean): Include debug information in the response (default: false)
+- **Parameters** (the module's prefix is `rlu`):
+  - `rlufollowredirects` (boolean): Follow up to two levels of redirects (default: false)
+  - `rludebug` (boolean): Include debug information in the response (default: false)
+
+A page with no recorded human edit is answered with
+`"reallastupdate": { "missing": true }` (an empty string in place of `true`
+under the default `formatversion=1`).
 
 #### Example API Response
 
