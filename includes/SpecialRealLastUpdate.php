@@ -103,7 +103,8 @@ class SpecialRealLastUpdate extends SpecialPage {
 	 *
 	 * Read access is decided per title (Lockdown, for one, restricts whole
 	 * namespaces through the per-title permission hook), so one title in
-	 * each namespace stands in for the namespace.
+	 * each namespace stands in for the namespace. That decides what is
+	 * offered and queried; the pager still checks each row it shows.
 	 *
 	 * @return int[]
 	 */

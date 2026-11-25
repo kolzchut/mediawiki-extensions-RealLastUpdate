@@ -20,6 +20,9 @@ class SpecialRealLastUpdateTest extends SpecialPageTestBase {
 	/** A namespace only sysops may read in these tests. */
 	private const NS_RESTRICTED = 120;
 
+	/** A page in a readable namespace that only sysops may read, as a per-title rule would make it. */
+	private const RESTRICTED_SINGLE_TITLE = 'RealLastUpdate_single_hidden_page';
+
 	/** The instance the last executeSpecialPage() call ran, kept to inspect it. */
 	private ?SpecialRealLastUpdate $page = null;
 
@@ -42,7 +45,8 @@ class SpecialRealLastUpdateTest extends SpecialPageTestBase {
 		$this->setTemporaryHook( 'getUserPermissionsErrors',
 			static function ( $title, $user, $action, &$result ) use ( $userGroupManager ) {
 				if ( $action === 'read'
-					&& $title->getNamespace() === self::NS_RESTRICTED
+					&& ( $title->getNamespace() === self::NS_RESTRICTED
+						|| $title->getDBkey() === self::RESTRICTED_SINGLE_TITLE )
 					&& !in_array( 'sysop', $userGroupManager->getUserEffectiveGroups( $user ), true )
 				) {
 					$result = [ 'badaccess-group0' ];
@@ -163,5 +167,19 @@ class SpecialRealLastUpdateTest extends SpecialPageTestBase {
 
 		$this->assertStringContainsString( 'RealLastUpdate listed page', $html );
 		$this->assertStringNotContainsString( $hidden, $html );
+	}
+
+	public function testPerTitleRestrictionIsHonouredRowByRow(): void {
+		$this->getExistingTestPage( Title::makeTitle( NS_MAIN, self::RESTRICTED_SINGLE_TITLE ) );
+		$this->getExistingTestPage( 'RealLastUpdate listed page' );
+		$hidden = strtr( self::RESTRICTED_SINGLE_TITLE, '_', ' ' );
+		$request = new FauxRequest( [ 'namespace' => (string)NS_MAIN, 'limit' => '500' ] );
+
+		[ $html ] = $this->executeSpecialPage( '', $request, 'qqx', $this->editorWithoutRestrictedRead() );
+		$this->assertStringContainsString( 'RealLastUpdate listed page', $html );
+		$this->assertStringNotContainsString( $hidden, $html );
+
+		[ $html ] = $this->executeSpecialPage( '', $request, 'qqx', $this->getTestSysop()->getUser() );
+		$this->assertStringContainsString( $hidden, $html, 'A reader of the page must still see it' );
 	}
 }
