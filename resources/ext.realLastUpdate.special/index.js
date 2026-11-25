@@ -24,7 +24,7 @@
 		mw.user.options.set( 'reallastupdate-showalldates', showAll ? '1' : '0' );
 
 		return new mw.Api().saveOption( 'reallastupdate-showalldates', showAll ? '1' : '0' )
-			.catch( function( error ) {
+			.catch( function ( error ) {
 				mw.log.warn( 'Failed to save preference:', error );
 				return false;
 			} );
@@ -32,31 +32,33 @@
 	}
 
 	$( function () {
+		var showAllDates, toggleSwitch, fieldLayout, $container;
+
 		// Initial state from user preference - first try to read from mw.user.options
-		var showAllDates = mw.user.options.get( 'reallastupdate-showalldates' ) === '1';
+		showAllDates = mw.user.options.get( 'reallastupdate-showalldates' ) === '1';
 
 		// Fall back to config if needed
 		if ( mw.user.options.get( 'reallastupdate-showalldates' ) === null &&
-		     mw.config.exists( 'wgRealLastUpdateShowAllDates' ) ) {
+			mw.config.exists( 'wgRealLastUpdateShowAllDates' ) ) {
 			showAllDates = mw.config.get( 'wgRealLastUpdateShowAllDates' );
 		}
 
 		// Create toggle widget
-		var toggleSwitch = new OO.ui.ToggleSwitchWidget( {
+		toggleSwitch = new OO.ui.ToggleSwitchWidget( {
 			value: showAllDates
 		} );
 
 		toggleSwitch.onChange = function ( showAll ) {
 			toggleIdenticalDates( showAll );
 			saveTogglePreference( showAll );
-		}
+		};
 
-		var fieldLayout = new OO.ui.FieldLayout( toggleSwitch, {
+		fieldLayout = new OO.ui.FieldLayout( toggleSwitch, {
 			label: mw.msg( 'reallastupdate-show-all-dates' ),
 			align: 'inline'
-		} )
+		} );
 
-		var $container = $( '.reallastupdate-toggle-container' );
+		$container = $( '.reallastupdate-toggle-container' );
 		$container.append( fieldLayout.$element );
 
 		// Apply initial state

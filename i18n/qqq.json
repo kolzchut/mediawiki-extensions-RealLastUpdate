@@ -4,6 +4,7 @@
 		]
 	},
 	"reallastupdate-desc": "{{desc|name=RealLastUpdate|url=https://github.com/kolzchut/mediawiki-extensions-RealLastUpdate}}",
+	"reallastupdate-apierror-no-real-revision": "{{doc-apierror}}\nError when no edit by a human was found for a page.\n\nParameters:\n* $1 - the page title",
 	"reallastupdate": "{{doc-special|RealLastUpdate}}",
 	"reallastupdate-specialpage-desc": "{{doc-special|RealLastUpdate}}",
 	"reallastupdate-namespace": "Label for namespace filter in special page form",
