@@ -28,5 +28,12 @@
 	"reallastupdate-no-diff-days": "Text shown when there is no difference in days (or data is missing).",
 	"reallastupdate-diff-days-value": "Message showing the number of days difference. Parameter: $1 - number of days.",
 	"reallastupdate-namespace-unreadable": "Error shown on Special:RealLastUpdate when the namespace in the request is one the viewer cannot read.",
-	"apiwarn-reallastupdate-cannotread": "{{doc-apierror}}\nWarning from prop=reallastupdate when the caller cannot read a requested page, or the page a followed redirect points to.\n\nParameters:\n* $1 - the requested title"
+	"apiwarn-reallastupdate-cannotread": "{{doc-apierror}}\nWarning from prop=reallastupdate when the caller cannot read a requested page, or the page a followed redirect points to.\n\nParameters:\n* $1 - the requested title",
+	"apihelp-query+reallastupdate-summary": "{{doc-apihelp-summary|query+reallastupdate}}",
+	"apihelp-query+reallastupdate-param-debug": "{{doc-apihelp-param|query+reallastupdate|debug}}",
+	"apihelp-query+reallastupdate-param-followredirects": "{{doc-apihelp-param|query+reallastupdate|followredirects}}",
+	"apihelp-query+reallastupdate-example-1": "{{doc-apihelp-example|query+reallastupdate}}",
+	"apihelp-query+reallastupdate-example-2": "{{doc-apihelp-example|query+reallastupdate}}",
+	"apihelp-query+reallastupdate-example-3": "{{doc-apihelp-example|query+reallastupdate}}",
+	"apihelp-query+reallastupdate-example-4": "{{doc-apihelp-example|query+reallastupdate}}"
 }

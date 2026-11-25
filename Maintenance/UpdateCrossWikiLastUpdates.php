@@ -8,6 +8,7 @@ namespace MediaWiki\Extension\RealLastUpdate\Maintenance;
 
 use Maintenance;
 use MediaWiki\Extension\RealLastUpdate\RealLastUpdate;
+use MediaWiki\Extension\RealLastUpdate\SourceWikiApi;
 use MediaWiki\MediaWikiServices;
 use TitleFormatter;
 use TitleParser;
@@ -1045,17 +1046,13 @@ class UpdateCrossWikiLastUpdates extends Maintenance {
 
 				$pageId = (int)$pageId;
 
-				// If this page has RLU data, assign it to all related titles
-				if ( isset( $pageData['reallastupdate'] ) ) {
-					$rlu = $pageData['reallastupdate'];
-					$rluData = [
-						'rev_id' => $rlu['revision'],
-						'timestamp' => $rlu['timestamp']
-					];
-
+				// If this page has RLU data, assign it to all related titles. A
+				// page the source answers as 'missing' has none, and is skipped.
+				$rluData = SourceWikiApi::getLastUpdate( $pageData );
+				if ( $rluData !== null ) {
 					if ( $debug ) {
 						$this->output( "  Found RLU data for page ID $pageId: " .
-							"rev={$rlu['revision']}, ts={$rlu['timestamp']}\n" );
+							"rev={$rluData['rev_id']}, ts={$rluData['timestamp']}\n" );
 					}
 
 					// Direct mapping - if this page ID has titles mapped to it
