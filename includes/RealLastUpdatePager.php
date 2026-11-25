@@ -124,9 +124,13 @@ class RealLastUpdatePager extends TablePager {
 			] ],
 		];
 
-		// Filter by namespace if specified
-		if ( $this->filterOptions['namespace'] !== null ) {
-			$queryInfo['conds']['page_namespace'] = $this->filterOptions['namespace'];
+		// Only the namespaces the special page found the viewer may read;
+		// without that list, nothing is listed.
+		$namespaces = $this->filterOptions['namespaces'] ?? [];
+		if ( $namespaces ) {
+			$queryInfo['conds']['page_namespace'] = $namespaces;
+		} else {
+			$queryInfo['conds'][] = '1=0';
 		}
 
 		// Add ArticleType join if extension is loaded and filter is set

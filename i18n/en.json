@@ -27,5 +27,7 @@
 	"reallastupdate-source-update": "Update from $1:$2 on $3",
 	"reallastupdate-diff-days": "Difference in days",
 	"reallastupdate-no-diff-days": "No difference",
-	"reallastupdate-diff-days-value": "$1"
+	"reallastupdate-diff-days-value": "$1",
+	"reallastupdate-namespace-unreadable": "You cannot read pages in the selected namespace, so they are not listed.",
+	"apiwarn-reallastupdate-cannotread": "Real last update data for \"$1\" was left out: you cannot read that page, or the page it redirects to."
 }
