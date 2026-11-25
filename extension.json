@@ -73,7 +73,12 @@
 		"remoteExtPath": "WikiRights/RealLastUpdate"
 	},
 	"SpecialPages": {
-		"RealLastUpdate": "MediaWiki\\Extension\\RealLastUpdate\\SpecialRealLastUpdate"
+		"RealLastUpdate": {
+			"class": "MediaWiki\\Extension\\RealLastUpdate\\SpecialRealLastUpdate",
+			"services": [
+				"NamespaceInfo"
+			]
+		}
 	},
 	"ExtensionMessagesFiles": {
 		"RealLastUpdateAlias": "i18n/RealLastUpdate.alias.php"

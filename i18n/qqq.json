@@ -4,6 +4,7 @@
 		]
 	},
 	"reallastupdate-desc": "{{desc|name=RealLastUpdate|url=https://github.com/kolzchut/mediawiki-extensions-RealLastUpdate}}",
+	"reallastupdate-apierror-no-real-revision": "{{doc-apierror}}\nError when no edit by a human was found for a page.\n\nParameters:\n* $1 - the page title",
 	"reallastupdate": "{{doc-special|RealLastUpdate}}",
 	"reallastupdate-specialpage-desc": "{{doc-special|RealLastUpdate}}",
 	"reallastupdate-namespace": "Label for namespace filter in special page form",
@@ -25,5 +26,7 @@
 	"reallastupdate-source-update": "Text for source wiki update information. Parameters: $1 - source wiki code, $2 - source title, $3 - formatted timestamp",
 	"reallastupdate-diff-days": "Column header for the difference in days between the real last update and the source's real last update.",
 	"reallastupdate-no-diff-days": "Text shown when there is no difference in days (or data is missing).",
-	"reallastupdate-diff-days-value": "Message showing the number of days difference. Parameter: $1 - number of days."
+	"reallastupdate-diff-days-value": "Message showing the number of days difference. Parameter: $1 - number of days.",
+	"reallastupdate-namespace-unreadable": "Error shown on Special:RealLastUpdate when the namespace in the request is one the viewer cannot read.",
+	"apiwarn-reallastupdate-cannotread": "{{doc-apierror}}\nWarning from prop=reallastupdate when the caller cannot read a requested page, or the page a followed redirect points to.\n\nParameters:\n* $1 - the requested title"
 }

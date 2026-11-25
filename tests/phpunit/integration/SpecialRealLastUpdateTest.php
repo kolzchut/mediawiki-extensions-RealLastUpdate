@@ -3,6 +3,10 @@
 namespace MediaWiki\Extension\RealLastUpdate\Tests\Integration;
 
 use MediaWiki\Extension\RealLastUpdate\SpecialRealLastUpdate;
+use MediaWiki\MainConfigNames;
+use MediaWiki\Request\FauxRequest;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 use PermissionsError;
 use SpecialPageTestBase;
 use Wikimedia\TestingAccessWrapper;
@@ -13,6 +17,12 @@ use Wikimedia\TestingAccessWrapper;
  */
 class SpecialRealLastUpdateTest extends SpecialPageTestBase {
 
+	/** A namespace only sysops may read in these tests. */
+	private const NS_RESTRICTED = 120;
+
+	/** A page in a readable namespace that only sysops may read, as a per-title rule would make it. */
+	private const RESTRICTED_SINGLE_TITLE = 'RealLastUpdate_single_hidden_page';
+
 	/** The instance the last executeSpecialPage() call ran, kept to inspect it. */
 	private ?SpecialRealLastUpdate $page = null;
 
@@ -21,11 +31,57 @@ class SpecialRealLastUpdateTest extends SpecialPageTestBase {
 		// Core's defaults let anonymous users edit; the sites do not.
 		$this->setGroupPermissions( '*', 'edit', false );
 		$this->setGroupPermissions( 'user', 'edit', true );
+
+		if ( !$this->getServiceContainer()->getNamespaceInfo()->exists( self::NS_RESTRICTED ) ) {
+			$this->overrideConfigValue( MainConfigNames::ExtraNamespaces, [
+				self::NS_RESTRICTED => 'RealLastUpdateRestricted',
+				self::NS_RESTRICTED + 1 => 'RealLastUpdateRestricted_talk',
+			] );
+		}
+
+		// A per-namespace read restriction, as an extension such as Lockdown sets
+		// through this same hook.
+		$userGroupManager = $this->getServiceContainer()->getUserGroupManager();
+		$this->setTemporaryHook( 'getUserPermissionsErrors',
+			static function ( $title, $user, $action, &$result ) use ( $userGroupManager ) {
+				if ( $action === 'read'
+					&& ( $title->getNamespace() === self::NS_RESTRICTED
+						|| $title->getDBkey() === self::RESTRICTED_SINGLE_TITLE )
+					&& !in_array( 'sysop', $userGroupManager->getUserEffectiveGroups( $user ), true )
+				) {
+					$result = [ 'badaccess-group0' ];
+					return false;
+				}
+				return true;
+			}
+		);
 	}
 
 	protected function newSpecialPage() {
-		$this->page = new SpecialRealLastUpdate();
+		$this->page = new SpecialRealLastUpdate( $this->getServiceContainer()->getNamespaceInfo() );
 		return $this->page;
+	}
+
+	/**
+	 * An editor who cannot read the restricted namespace, the case the
+	 * listing must not leak to.
+	 *
+	 * @return User
+	 */
+	private function editorWithoutRestrictedRead(): User {
+		$user = $this->getTestUser()->getUser();
+		$this->assertTrue(
+			$this->getServiceContainer()->getPermissionManager()->userHasRight( $user, 'edit' ),
+			'The fixture user must hold edit, or the test proves nothing'
+		);
+		return $user;
+	}
+
+	private function addRestrictedPage(): string {
+		$this->getExistingTestPage(
+			Title::makeTitle( self::NS_RESTRICTED, 'RealLastUpdate hidden listed page' )
+		);
+		return 'RealLastUpdate hidden listed page';
 	}
 
 	public function testRestrictionIsEdit(): void {
@@ -62,5 +118,68 @@ class SpecialRealLastUpdateTest extends SpecialPageTestBase {
 		$this->assertNotNull( TestingAccessWrapper::newFromObject( $this->page )->pager );
 		$this->assertStringContainsString( '(reallastupdate-filter-legend)', $html );
 		$this->assertStringContainsString( 'RealLastUpdate listed page', $html );
+	}
+
+	public function testNamespaceSelectorLeavesOutUnreadableNamespaces(): void {
+		$option = static fn ( int $namespace ) => '/<option value=["\']' . $namespace . '["\']/';
+
+		[ $html ] = $this->executeSpecialPage( '', null, 'qqx', $this->editorWithoutRestrictedRead() );
+		$this->assertMatchesRegularExpression( $option( NS_MAIN ), $html );
+		$this->assertDoesNotMatchRegularExpression( $option( self::NS_RESTRICTED ), $html );
+
+		[ $html ] = $this->executeSpecialPage( '', null, 'qqx', $this->getTestSysop()->getUser() );
+		$this->assertMatchesRegularExpression(
+			$option( self::NS_RESTRICTED ),
+			$html,
+			'A reader of the namespace must still be offered it'
+		);
+	}
+
+	public function testUnreadableNamespaceIsNotQueried(): void {
+		$hidden = $this->addRestrictedPage();
+		$request = new FauxRequest( [ 'namespace' => (string)self::NS_RESTRICTED ] );
+
+		[ $html ] = $this->executeSpecialPage( '', $request, 'qqx', $this->editorWithoutRestrictedRead() );
+
+		$this->assertStringContainsString( '(reallastupdate-namespace-unreadable)', $html );
+		$this->assertStringNotContainsString( $hidden, $html );
+		$this->assertNull(
+			TestingAccessWrapper::newFromObject( $this->page )->pager,
+			'No report query may be built for a namespace the viewer cannot read'
+		);
+	}
+
+	public function testReaderOfTheNamespaceGetsItsPages(): void {
+		$hidden = $this->addRestrictedPage();
+		$request = new FauxRequest( [ 'namespace' => (string)self::NS_RESTRICTED ] );
+
+		[ $html ] = $this->executeSpecialPage( '', $request, 'qqx', $this->getTestSysop()->getUser() );
+
+		$this->assertStringContainsString( $hidden, $html );
+	}
+
+	public function testAllNamespacesLeavesOutUnreadableOnes(): void {
+		$hidden = $this->addRestrictedPage();
+		$this->getExistingTestPage( 'RealLastUpdate listed page' );
+		$request = new FauxRequest( [ 'namespace' => '', 'limit' => '500' ] );
+
+		[ $html ] = $this->executeSpecialPage( '', $request, 'qqx', $this->editorWithoutRestrictedRead() );
+
+		$this->assertStringContainsString( 'RealLastUpdate listed page', $html );
+		$this->assertStringNotContainsString( $hidden, $html );
+	}
+
+	public function testPerTitleRestrictionIsHonouredRowByRow(): void {
+		$this->getExistingTestPage( Title::makeTitle( NS_MAIN, self::RESTRICTED_SINGLE_TITLE ) );
+		$this->getExistingTestPage( 'RealLastUpdate listed page' );
+		$hidden = strtr( self::RESTRICTED_SINGLE_TITLE, '_', ' ' );
+		$request = new FauxRequest( [ 'namespace' => (string)NS_MAIN, 'limit' => '500' ] );
+
+		[ $html ] = $this->executeSpecialPage( '', $request, 'qqx', $this->editorWithoutRestrictedRead() );
+		$this->assertStringContainsString( 'RealLastUpdate listed page', $html );
+		$this->assertStringNotContainsString( $hidden, $html );
+
+		[ $html ] = $this->executeSpecialPage( '', $request, 'qqx', $this->getTestSysop()->getUser() );
+		$this->assertStringContainsString( $hidden, $html, 'A reader of the page must still see it' );
 	}
 }

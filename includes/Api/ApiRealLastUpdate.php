@@ -10,6 +10,7 @@ use ApiQueryBase;
 use MediaWiki\Extension\RealLastUpdate\RealLastUpdate;
 use MediaWiki\Page\RedirectLookup;
 use MediaWiki\Page\WikiPageFactory;
+use MediaWiki\Title\Title;
 use Wikimedia\ParamValidator\ParamValidator;
 
 /**
@@ -47,7 +48,7 @@ class ApiRealLastUpdate extends ApiQueryBase {
 	public function execute() {
 		// Get the titles from the PageSet
 		$pageSet = $this->getPageSet();
-		$titles = $pageSet->getGoodTitles();
+		$titles = array_map( [ Title::class, 'newFromPageIdentity' ], $pageSet->getGoodPages() );
 
 		if ( !count( $titles ) ) {
 			return;
@@ -60,6 +61,12 @@ class ApiRealLastUpdate extends ApiQueryBase {
 		$result = $this->getResult();
 
 		foreach ( $titles as $pageId => $title ) {
+			// The PageSet resolves every title it is given, so a title the
+			// caller cannot read reaches this loop too. Its data is left out.
+			if ( !$this->canRead( $title, $title ) ) {
+				continue;
+			}
+
 			$isRedirect = $title->isRedirect();
 
 			$this->addDebugInfo( "Processing title: " . $title->getPrefixedText() . " (ID: $pageId)" );
@@ -89,6 +96,12 @@ class ApiRealLastUpdate extends ApiQueryBase {
 					$result->addValue( $path, 'redirecttarget', [
 						'missing' => true
 					] );
+					continue;
+				}
+
+				// Following the redirect must not reveal a target the caller
+				// cannot read.
+				if ( !$this->canRead( $targetTitle, $title ) ) {
 					continue;
 				}
 
@@ -126,6 +139,10 @@ class ApiRealLastUpdate extends ApiQueryBase {
 								'missing' => true
 							]
 						] );
+						continue;
+					}
+
+					if ( !$this->canRead( $finalTitle, $title ) ) {
 						continue;
 					}
 
@@ -206,12 +223,34 @@ class ApiRealLastUpdate extends ApiQueryBase {
 	}
 
 	/**
+	 * Whether the caller may read a page whose data is about to be returned
+	 *
+	 * When they may not, a warning names the requested title, which the
+	 * PageSet has already put in the result, never the page that was refused.
+	 *
+	 * @param Title $page The page whose data would be returned
+	 * @param Title $requested The title the caller asked for
+	 * @return bool
+	 */
+	private function canRead( Title $page, Title $requested ): bool {
+		if ( $this->getAuthority()->authorizeRead( 'read', $page ) ) {
+			return true;
+		}
+		$this->addWarning( [
+			'apiwarn-reallastupdate-cannotread',
+			wfEscapeWikiText( $requested->getPrefixedText() )
+		] );
+		return false;
+	}
+
+	/**
 	 * Add debug information to the API response if requested
 	 *
 	 * @param string $info Debug information to add
 	 */
 	private function addDebugInfo( $info ) {
-		if ( $this->getMain()->getParameter( 'debug' ) ) {
+		// The module's own parameter; ApiMain has no 'debug' to read.
+		if ( $this->getParameter( 'debug' ) ) {
 			$this->getResult()->addValue(
 				[ 'query', 'debuginfo' ],
 				null,

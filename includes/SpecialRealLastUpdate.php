@@ -25,6 +25,9 @@ namespace MediaWiki\Extension\RealLastUpdate;
 
 use ExtensionRegistry;
 use HTMLForm;
+use MediaWiki\Html\Html;
+use MediaWiki\Title\NamespaceInfo;
+use MediaWiki\Title\Title;
 use SpecialPage;
 
 class SpecialRealLastUpdate extends SpecialPage {
@@ -34,8 +37,14 @@ class SpecialRealLastUpdate extends SpecialPage {
 	/** @var array */
 	protected array $formFilter = [];
 
-	public function __construct() {
+	private NamespaceInfo $namespaceInfo;
+
+	/**
+	 * @param NamespaceInfo $namespaceInfo
+	 */
+	public function __construct( NamespaceInfo $namespaceInfo ) {
 		parent::__construct( 'RealLastUpdate', 'edit' );
+		$this->namespaceInfo = $namespaceInfo;
 	}
 
 	/**
@@ -51,14 +60,38 @@ class SpecialRealLastUpdate extends SpecialPage {
 		$out->addModuleStyles( 'mediawiki.special' );
 		$out->addModules( 'ext.realLastUpdate.special' );
 
-		// Parse request parameters
+		// Parse request parameters. No namespace means the main namespace,
+		// and an empty one means every namespace the viewer can read.
 		$request = $this->getRequest();
-		$this->formFilter['namespace'] = $request->getInt( 'namespace', NS_MAIN );
+		$namespace = $request->getVal( 'namespace' );
+		if ( $namespace === null ) {
+			$namespace = NS_MAIN;
+		} elseif ( $namespace === '' ) {
+			$namespace = null;
+		} else {
+			$namespace = (int)$namespace;
+		}
+		$this->formFilter['namespace'] = $namespace;
 		$this->formFilter['articletype'] = $request->getVal( 'articletype' );
 		$this->formFilter['contentarea'] = $request->getVal( 'contentarea' );
 
+		// The report lists titles and their edit times, so it covers only
+		// namespaces the viewer may read; having 'edit' does not imply that.
+		$readable = $this->getReadableNamespaces();
+
 		// Show the filter form
-		$this->showFilterForm();
+		$this->showFilterForm( $readable );
+
+		$namespaces = $namespace === null
+			? $readable
+			: array_values( array_intersect( [ $namespace ], $readable ) );
+		if ( !$namespaces ) {
+			$out->addHTML( Html::errorBox(
+				$this->msg( 'reallastupdate-namespace-unreadable' )->escaped()
+			) );
+			return;
+		}
+		$this->formFilter['namespaces'] = $namespaces;
 
 		// Show the pager
 		$this->pager = new RealLastUpdatePager( $this, $this->formFilter );
@@ -66,17 +99,45 @@ class SpecialRealLastUpdate extends SpecialPage {
 	}
 
 	/**
-	 * Show the filter form with namespace, article type and content area filters
+	 * The namespaces whose pages the viewer may read
+	 *
+	 * Read access is decided per title (Lockdown, for one, restricts whole
+	 * namespaces through the per-title permission hook), so one title in
+	 * each namespace stands in for the namespace. That decides what is
+	 * offered and queried; the pager still checks each row it shows.
+	 *
+	 * @return int[]
 	 */
-	private function showFilterForm() {
+	private function getReadableNamespaces(): array {
+		$authority = $this->getAuthority();
+		$readable = [];
+		foreach ( $this->namespaceInfo->getValidNamespaces() as $namespace ) {
+			$probe = Title::makeTitle( $namespace, 'RealLastUpdate' );
+			if ( $authority->authorizeRead( 'read', $probe ) ) {
+				$readable[] = $namespace;
+			}
+		}
+		return $readable;
+	}
+
+	/**
+	 * Show the filter form with namespace, article type and content area filters
+	 *
+	 * @param int[] $readable The namespaces the viewer may read; only these are offered
+	 */
+	private function showFilterForm( array $readable ) {
+		$namespaceOptions = Html::namespaceSelectorOptions( [
+			'all' => '',
+			'exclude' => array_diff( $this->namespaceInfo->getValidNamespaces(), $readable ),
+		] );
 		$formDescriptor = [
 			'namespace' => [
-				'type' => 'namespaceselect',
+				'type' => 'select',
 				'name' => 'namespace',
 				'id' => 'namespace',
 				'label-message' => 'reallastupdate-namespace',
-				'default' => $this->formFilter['namespace'] ?? NS_MAIN,
-				'all' => true,
+				'options' => array_flip( $namespaceOptions ),
+				'default' => $this->formFilter['namespace'] ?? '',
 			]
 		];
 

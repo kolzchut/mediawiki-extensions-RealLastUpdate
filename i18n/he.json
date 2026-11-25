@@ -27,5 +27,7 @@
 	"reallastupdate-source-update": "עדכון מ-$1:$2 בתאריך $3",
 	"reallastupdate-diff-days": "הפרש בימים",
 	"reallastupdate-no-diff-days": "אין הפרש",
-	"reallastupdate-diff-days-value": "$1"
+	"reallastupdate-diff-days-value": "$1",
+	"reallastupdate-namespace-unreadable": "אין לך הרשאה לקרוא דפים במרחב השם שנבחר, ולכן הם אינם מוצגים.",
+	"apiwarn-reallastupdate-cannotread": "נתוני העדכון האחרון של \"$1\" לא הוחזרו: אין לך הרשאה לקרוא את הדף, או את הדף שאליו הוא מפנה."
 }

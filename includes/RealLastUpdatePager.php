@@ -28,6 +28,7 @@ use Html;
 use MalformedTitleException;
 use MediaWiki\Linker\LinkRenderer;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\Title\Title;
 use MediaWiki\User\UserOptionsLookup;
 use TablePager;
 use TitleParser;
@@ -124,9 +125,13 @@ class RealLastUpdatePager extends TablePager {
 			] ],
 		];
 
-		// Filter by namespace if specified
-		if ( $this->filterOptions['namespace'] !== null ) {
-			$queryInfo['conds']['page_namespace'] = $this->filterOptions['namespace'];
+		// Only the namespaces the special page found the viewer may read;
+		// without that list, nothing is listed.
+		$namespaces = $this->filterOptions['namespaces'] ?? [];
+		if ( $namespaces ) {
+			$queryInfo['conds']['page_namespace'] = $namespaces;
+		} else {
+			$queryInfo['conds'][] = '1=0';
 		}
 
 		// Add ArticleType join if extension is loaded and filter is set
@@ -174,6 +179,24 @@ class RealLastUpdatePager extends TablePager {
 		}
 
 		return $queryInfo;
+	}
+
+	/**
+	 * Leave out a row whose page the viewer cannot read
+	 *
+	 * The query is limited to namespaces the viewer can read, judged by one
+	 * title in each. A rule that restricts single titles is honoured here, so
+	 * a result page can hold fewer rows than the limit.
+	 *
+	 * @param \stdClass $row
+	 * @return string
+	 */
+	public function formatRow( $row ) {
+		$title = Title::makeTitle( (int)$row->page_namespace, $row->page_title );
+		if ( !$this->getAuthority()->authorizeRead( 'read', $title ) ) {
+			return '';
+		}
+		return parent::formatRow( $row );
 	}
 
 	/**

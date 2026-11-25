@@ -23,16 +23,16 @@
 }
 
 /* Ensure the page column gets more space */
-.tablesorter th:nth-child(1),
-.tablesorter td:nth-child(1) {
+.tablesorter th:nth-child( 1 ),
+.tablesorter td:nth-child( 1 ) {
 	width: 50%;
 }
 
 /* Make date columns equal width */
-.tablesorter th:nth-child(2),
-.tablesorter td:nth-child(2),
-.tablesorter th:nth-child(3),
-.tablesorter td:nth-child(3) {
+.tablesorter th:nth-child( 2 ),
+.tablesorter td:nth-child( 2 ),
+.tablesorter th:nth-child( 3 ),
+.tablesorter td:nth-child( 3 ) {
 	width: 25%;
 }
 
